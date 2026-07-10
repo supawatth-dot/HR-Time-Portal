@@ -640,7 +640,7 @@ function parseTargetSecondsFromDWS(dwsText) {
   const match = dwsText.match(/(\d{2}):(\d{2})/);
   if (match) {
     const hh = parseInt(match[1], 10);
-    const mm = parseInt(match[2], 20);
+    const mm = parseInt(match[2], 10);
     return hh * 3600 + mm * 60;
   }
   return null;
