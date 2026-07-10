@@ -439,7 +439,8 @@ function buildPreHolidaysMap() {
   const sorted = [...AppState.holidays].filter(h => h.type === 'official').sort((a, b) => a.date.localeCompare(b.date));
   sorted.forEach(h => {
     const parts = h.date.split('-').map(Number);
-    let dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    // Construct at 12:00 Noon so setDate(-1) cannot cross midnight across timezones/DST
+    let dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
     
     // Step backwards by 1 day until we hit a working day (Mon-Fri that is not a holiday)
     let steps = 0;
@@ -589,14 +590,61 @@ async function handleFileUpload(file) {
  * Excel Date Serial to JS Date String (YYYY-MM-DD)
  */
 function excelSerialToDateStr(serial) {
-  if (typeof serial === 'string' && serial.includes('-')) return serial.slice(0, 10);
-  if (!serial || isNaN(serial)) return null;
-  const utc_days = Math.floor(serial - 25569);
-  const date_info = new Date(utc_days * 86400 * 1000);
-  const year = date_info.getUTCFullYear();
-  const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date_info.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  if (serial === null || serial === undefined || serial === '') return null;
+  
+  if (typeof serial === 'string') {
+    const s = serial.trim();
+    // Check YYYY-MM-DD or YYYY/MM/DD or YYYY.MM.DD
+    let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (m) {
+      return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    }
+    // Check DD/MM/YYYY or DD-MM-YYYY (or MM/DD/YYYY if first number > 12)
+    m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (m) {
+      const p1 = parseInt(m[1], 10);
+      const p2 = parseInt(m[2], 10);
+      const year = m[3];
+      if (p1 > 12 && p2 <= 12) {
+        // First part is definitely Day (>12), second is Month -> DD/MM/YYYY
+        return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+      } else if (p2 > 12 && p1 <= 12) {
+        // Second part is definitely Day (>12), first is Month -> MM/DD/YYYY
+        return `${year}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
+      } else {
+        // Default assuming standard Thai/British DD/MM/YYYY
+        return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+      }
+    }
+    const num = parseFloat(s);
+    if (!isNaN(num) && num > 10000) serial = num;
+    else return null;
+  }
+  
+  if (typeof serial === 'number' && !isNaN(serial) && serial > 0) {
+    const utc_days = Math.floor(serial - 25569);
+    const date_info = new Date(utc_days * 86400 * 1000);
+    const year = date_info.getUTCFullYear();
+    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date_info.getUTCDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return null;
+}
+
+/**
+ * Safe Day of Week Calculation (0 = Sun, 5 = Fri, 6 = Sat)
+ * Uses 12:00 Noon Local Time to guarantee zero timezone offset midnight shift
+ */
+function getDayOfWeekSafe(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return 0;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+    return dt.getDay();
+  }
+  const dt = new Date(dateStr);
+  return isNaN(dt.getTime()) ? 0 : dt.getDay();
 }
 
 /**
@@ -692,9 +740,8 @@ function recalculateAndRenderAll() {
     const dept = String(row[21] || row[20] || 'Workshop').trim() || 'Workshop';
     deptsSet.add(dept);
 
-    // Day of week check
-    const dtObj = new Date(dateStr);
-    const dayOfWeek = dtObj.getDay(); // 0 = Sun, 1 = Mon, ... 5 = Fri, 6 = Sat
+    // Day of week check using safe noon construction
+    const dayOfWeek = getDayOfWeekSafe(dateStr); // 0 = Sun, 1 = Mon, ... 5 = Fri, 6 = Sat
 
     // Check if Friday or Pre-holiday
     const isFriday = (dayOfWeek === 5);
@@ -716,7 +763,11 @@ function recalculateAndRenderAll() {
     } else {
       // Mode 'dws'
       const parsedDWS = parseTargetSecondsFromDWS(dwsText);
-      if (parsedDWS !== null) {
+      if (isPreHoliday && (parsedDWS === null || parsedDWS === 28800 || parsedDWS === 25200)) {
+        // Enforce 07:00 target on Friday and Pre-Holidays if DWS is standard morning shift or unset
+        targetSeconds = 25200;
+        targetStr = '07:00:00';
+      } else if (parsedDWS !== null) {
         targetSeconds = parsedDWS;
         const hh = Math.floor(targetSeconds / 3600);
         const mm = Math.floor((targetSeconds % 3600) / 60);
