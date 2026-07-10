@@ -16,16 +16,20 @@ const AppState = {
   dailyPage: 1,
   dailyPerPage: 100,
   selectedEmployeeForModal: null,
-  currentFileName: 'Clock in and out_01.01.26 to 30.06.26.xlsx'
+  currentFileName: 'Clock in and out_01.01.26 to 30.06.26.xlsx',
+  lang: localStorage.getItem('hr_time_lang') || 'th'
 };
 
-// Thai Day Names
+// Day Names
 const THAI_DAYS_SHORT = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
 const THAI_DAYS_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+const ENG_DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const ENG_DAYS_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
+  applyLanguage();
   await loadHolidays();
   await loadDefaultExcel();
 });
@@ -58,6 +62,16 @@ function setupEventListeners() {
     });
   });
 
+  // Language Toggle Button
+  const langToggleBtn = document.getElementById('lang-toggle');
+  if (langToggleBtn) {
+    langToggleBtn.addEventListener('click', () => {
+      AppState.lang = AppState.lang === 'th' ? 'en' : 'th';
+      localStorage.setItem('hr_time_lang', AppState.lang);
+      applyLanguage();
+    });
+  }
+
   // Mode Toggle Buttons
   document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -67,9 +81,9 @@ function setupEventListeners() {
       
       const badge = document.getElementById('current-mode-badge');
       if (AppState.mode === 'workshop') {
-        badge.textContent = 'กฎ Workshop (08:00/07:00)';
+        badge.textContent = AppState.lang === 'en' ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
       } else {
-        badge.textContent = 'กฎตามกะ (DWS Column)';
+        badge.textContent = AppState.lang === 'en' ? 'Shift Schedule (DWS Column)' : 'กฎตามกะ (DWS Column)';
       }
       recalculateAndRenderAll();
     });
@@ -86,10 +100,10 @@ function setupEventListeners() {
       const hintSpan = document.getElementById('hint-target-text');
       const min = Math.floor(AppState.lateToleranceSec / 60);
       if (min === 0) {
-        hintSpan.textContent = 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.';
+        hintSpan.textContent = AppState.lang === 'en' ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.';
       } else {
         const mm = String(min).padStart(2, '0');
-        hintSpan.textContent = `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`;
+        hintSpan.textContent = AppState.lang === 'en' ? `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}` : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`;
       }
       recalculateAndRenderAll();
     });
@@ -217,11 +231,147 @@ function setupEventListeners() {
       exportEmployeeModalXLSX(AppState.selectedEmployeeForModal);
     }
   });
+}
 
-  // Open holidays tab quick button
-  document.getElementById('btn-open-holidays').addEventListener('click', () => {
-    document.querySelector('.tab-btn[data-tab="tab-holidays"]').click();
-  });
+/**
+ * Apply Internationalization (Thai / English)
+ */
+function applyLanguage() {
+  const isEn = AppState.lang === 'en';
+  const toggleText = document.getElementById('lang-toggle-text');
+  if (toggleText) {
+    toggleText.innerHTML = isEn ? '🇹🇭 ไทย' : '🇬🇧 EN';
+  }
+
+  // Brand text
+  const brandH1 = document.querySelector('.brand-text h1');
+  const brandP = document.querySelector('.brand-text p');
+  if (brandH1) brandH1.textContent = isEn ? 'HR-Time Workshop Portal' : 'HR-Time Workshop Portal';
+  if (brandP) brandP.textContent = isEn ? 'Automated Workshop Attendance & Food Allowance Engine (25฿/Day)' : 'ระบบคำนวณเวลาเข้า-ออกงาน workshop และค่าข้าวพนักงานอัตโนมัติ';
+
+  // Current Mode Badge
+  const badge = document.getElementById('current-mode-badge');
+  if (badge) {
+    if (AppState.mode === 'workshop') {
+      badge.textContent = isEn ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
+    } else {
+      badge.textContent = isEn ? 'Shift Schedule (DWS Column)' : 'กฎตามกะ (DWS Column)';
+    }
+  }
+
+  // Upload box
+  const uploadH3 = document.querySelector('.upload-box h3');
+  const primaryDrop = document.querySelector('.primary-drop-text');
+  const secondaryDrop = document.querySelector('.secondary-drop-text');
+  const triggerBtn = document.getElementById('btn-trigger-upload');
+  const reloadBtn = document.getElementById('btn-reload-default');
+  if (uploadH3) uploadH3.innerHTML = isEn ? '📂 Attendance Data Source (Excel Upload)' : '📂 แหล่งข้อมูลการแตะบัตร (Excel Data Source)';
+  if (primaryDrop) primaryDrop.innerHTML = isEn ? 'Click to choose file or drag & drop <strong>Clock in and out.xlsx</strong> here' : 'คลิกเพื่อเลือกไฟล์ หรือลากไฟล์ <strong>Clock in and out.xlsx</strong> มาวางที่นี่';
+  if (secondaryDrop) secondaryDrop.textContent = isEn ? 'Supports time clock export files (.xlsx, .xls, .csv)' : 'รองรับข้อมูลจากไฟล์เครื่องรูดบัตร/แตะบัตร (.xlsx, .xls, .csv)';
+  if (triggerBtn) triggerBtn.textContent = isEn ? 'Choose Excel File' : 'เลือกไฟล์ Excel';
+  if (reloadBtn) reloadBtn.textContent = isEn ? '🔄 Reload Company Default' : '🔄 โหลดไฟล์บริษัทเริ่มต้น';
+
+  // Rules box
+  const rulesH3 = document.querySelector('.rules-box h3');
+  const openHolBtn = document.getElementById('btn-open-holidays');
+  const ruleLabels = document.querySelectorAll('.rule-group .rule-label');
+  if (rulesH3) rulesH3.innerHTML = isEn ? '⚙️ Food Allowance Rules (25฿/Day)' : '⚙️ หลักเกณฑ์และกฎคำนวณค่าข้าววันละ 25 บาท';
+  if (openHolBtn) openHolBtn.innerHTML = isEn ? '🏢 Manage Company Holidays' : '🏢 ตั้งค่าวันหยุดบริษัท';
+  if (ruleLabels[0]) ruleLabels[0].textContent = isEn ? '👉 Select Attendance Calculation Mode:' : '👉 เลือกโหมดการคำนวณเวลาเข้างาน:';
+  if (ruleLabels[1]) ruleLabels[1].textContent = isEn ? '🕒 Late Threshold Tolerance:' : '🕒 เกณฑ์เวลาสาย (Late Threshold):';
+
+  // Mode buttons text
+  const modeTitles = document.querySelectorAll('.mode-btn .mode-title');
+  const modeDescs = document.querySelectorAll('.mode-btn .mode-desc');
+  if (modeTitles[0]) modeTitles[0].textContent = isEn ? '⭐ Standard Workshop Mode' : '⭐ โหมด Workshop มาตรฐาน';
+  if (modeDescs[0]) modeDescs[0].textContent = isEn ? 'Mon-Thu 08:00 | Fri & Pre-Holiday 07:00' : 'จ-พฤ เข้า 08:00 น. | ศ และก่อนวันหยุด เข้า 07:00 น.';
+  if (modeTitles[1]) modeTitles[1].textContent = isEn ? '📋 Shift Schedule Mode (DWS)' : '📋 โหมดตารางงาน (DWS Column)';
+  if (modeDescs[1]) modeDescs[1].textContent = isEn ? 'Use Daily Work Schedule column from Excel' : 'อ้างอิงเวลาเข้าจากคอลัมน์ Daily Work Schedule ในไฟล์';
+
+  // Late tolerance pills
+  const pillBtns = document.querySelectorAll('.pill-btn');
+  if (pillBtns[0]) pillBtns[0].textContent = isEn ? 'Strict 0 Min' : 'ตรงเวลาเป๊ะ (0 นาที)';
+  if (pillBtns[1]) pillBtns[1].textContent = isEn ? '> 1 Min (= Late, 0฿)' : 'เกิน 1 นาที (=สาย อดค่าข้าว)';
+  if (pillBtns[2]) pillBtns[2].textContent = isEn ? '5 Min Grace' : 'ผ่อนผัน 5 นาที';
+  if (pillBtns[3]) pillBtns[3].textContent = isEn ? '15 Min Grace' : 'ผ่อนผัน 15 นาที';
+
+  // Hint text update
+  const min = Math.floor(AppState.lateToleranceSec / 60);
+  const hintSpan = document.getElementById('hint-target-text');
+  if (hintSpan) {
+    if (min === 0) hintSpan.textContent = isEn ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.';
+    else {
+      const mm = String(min).padStart(2, '0');
+      hintSpan.textContent = isEn ? `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}` : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`;
+    }
+  }
+
+  // KPI Labels
+  const kpiLabels = document.querySelectorAll('.kpi-label');
+  if (kpiLabels[0]) kpiLabels[0].textContent = isEn ? 'Total Employees' : 'พนักงานทั้งหมด (Employees)';
+  if (kpiLabels[1]) kpiLabels[1].textContent = isEn ? 'Punch Records' : 'รายการบันทึกเวลา (Punch Records)';
+  if (kpiLabels[2]) kpiLabels[2].textContent = isEn ? 'Total Food Allowance' : 'ยอดเบิกค่าข้าวรวม (Total Allowance)';
+  if (kpiLabels[3]) kpiLabels[3].textContent = isEn ? 'On-Time vs Late Rate' : 'อัตราเข้าตรงเวลา vs มาสาย';
+  if (kpiLabels[4]) kpiLabels[4].textContent = isEn ? 'Fri & Pre-Holiday Shifts (07:00)' : 'กะวันศุกร์และก่อนวันหยุด (07:00 น.)';
+
+  // Tabs
+  const tabBtns = document.querySelectorAll('.tab-list .tab-btn span:nth-child(2)');
+  if (tabBtns[0]) tabBtns[0].textContent = isEn ? '1. Employee Summary & Allowance' : '1. สรุปรายบุคคล & ยอดเบิกค่าข้าว';
+  if (tabBtns[1]) tabBtns[1].textContent = isEn ? '2. Daily Attendance Logs' : '2. บันทึกเวลาเข้า-ออกงานรายวัน';
+  if (tabBtns[2]) tabBtns[2].textContent = isEn ? '3. Holiday & Pre-Holiday Calendar' : '3. ปฏิทินวันหยุด & วันก่อนหยุดบริษัท';
+  if (tabBtns[3]) tabBtns[3].textContent = isEn ? '4. Analytics & Insights' : '4. วิเคราะห์สถิติ & อันดับความตรงเวลา';
+
+  // Toolbar
+  const printBtn = document.getElementById('btn-print-summary');
+  const exportToggle = document.getElementById('btn-export-dropdown');
+  const exportXlsx1 = document.getElementById('export-summary-xlsx');
+  const exportXlsx2 = document.getElementById('export-daily-xlsx');
+  const exportCsv = document.getElementById('export-summary-csv');
+  if (printBtn) printBtn.innerHTML = isEn ? '🖨️ Print Summary / PDF' : '🖨️ พิมพ์ใบสรุป / PDF';
+  if (exportToggle) exportToggle.innerHTML = isEn ? '📥 Export Data (Excel/CSV)' : '📥 Export ข้อมูล (Excel/CSV)';
+  if (exportXlsx1) exportXlsx1.innerHTML = isEn ? '📊 Export Employee Summary (.xlsx)' : '📊 Export สรุปค่าข้าวรายบุคคล (.xlsx)';
+  if (exportXlsx2) exportXlsx2.innerHTML = isEn ? '📋 Export Daily Punch Logs (.xlsx)' : '📋 Export รายการเข้า-ออกรายวัน (.xlsx)';
+  if (exportCsv) exportCsv.innerHTML = isEn ? '📄 Export Summary (.csv)' : '📄 Export สรุปรายบุคคล (.csv)';
+
+  // Summary Table Headers
+  const sumThs = document.querySelectorAll('#summary-table thead tr th');
+  if (sumThs.length >= 11) {
+    const enSum = ['ID', 'Employee Name', 'Department', 'Worked Days', 'On Time (Days)', 'Late (Days)', '07:00 Shift (Fri/Pre)', 'Total Allowance (฿)', 'Actual Hrs', 'Total OT', 'Actions'];
+    const thSum = ['รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'วันทำงานรวม', 'ตรงเวลา (วัน)', 'มาสาย (วัน)', 'กะ 07:00 (ศ/ก่อนหยุด)', 'ค่าข้าวยอดรวม (฿)', 'ชม. ทำงานจริง', 'ชม. OT', 'จัดการ'];
+    sumThs.forEach((th, idx) => { th.textContent = isEn ? enSum[idx] : thSum[idx]; });
+  }
+
+  // Daily Table Headers
+  const dailyThs = document.querySelectorAll('#daily-table thead tr th');
+  if (dailyThs.length >= 12) {
+    const enDaily = ['Date', 'Day', 'ID', 'Employee Name', 'DWS Schedule', 'Clock In', 'Target', 'Clock Out', 'Actual Hrs', 'Total OT', 'Status', 'Allowance'];
+    const thDaily = ['วันที่', 'วันในสัปดาห์', 'รหัส', 'ชื่อ-นามสกุลพนักงาน', 'กะงาน (DWS)', 'เวลาเข้าจริง', 'เป้าหมายเข้า', 'เวลาออกจริง', 'ชั่วโมง', 'OT รวม', 'สถานะสาย', 'ค่าข้าว'];
+    dailyThs.forEach((th, idx) => { th.textContent = isEn ? enDaily[idx] : thDaily[idx]; });
+  }
+
+  // Holiday Table & Form Headers
+  const holH3s = document.querySelectorAll('#tab-holidays h3');
+  if (holH3s[0]) holH3s[0].innerHTML = isEn ? '➕ Add New Company Holiday' : '➕ เพิ่มวันหยุดบริษัทใหม่ (Add Holiday)';
+  if (holH3s[1]) holH3s[1].innerHTML = isEn ? '🌟 Add Custom 07:00 Target Shift' : '🌟 เพิ่มวันก่อนหยุดพิเศษ / วันเข้า 07:00 แมนนวล';
+  if (holH3s[2]) holH3s[2].innerHTML = isEn ? '🗓️ 2026 Company Holidays & Pre-Holidays' : '🗓️ รายการวันหยุดและวันก่อนวันหยุดบริษัท ปี 2026';
+
+  const holThs = document.querySelectorAll('#tab-holidays thead tr th');
+  if (holThs.length >= 5) {
+    const enHol = ['Date', 'Type', 'Description / Reason', 'Target Start Time', 'Delete'];
+    const thHol = ['วันที่', 'ประเภท', 'ชื่อรายการ / เหตุผล', 'เวลาเข้างานกำหนด', 'ลบ'];
+    holThs.forEach((th, idx) => { th.textContent = isEn ? enHol[idx] : thHol[idx]; });
+  }
+
+  // Insights Headers
+  const insH3s = document.querySelectorAll('#tab-insights h3');
+  if (insH3s[0]) insH3s[0].innerHTML = isEn ? '🏆 Top 10 Most Punctual Employees' : '🏆 Top 10 พนักงานเข้างานตรงเวลาที่สุด';
+  if (insH3s[1]) insH3s[1].innerHTML = isEn ? '🚨 Top 10 Most Frequently Late Employees' : '🚨 Top 10 พนักงานมาสายบ่อยที่สุด (ตรวจสอบ)';
+  if (insH3s[2]) insH3s[2].innerHTML = isEn ? '📊 Late Frequency by Day of Week' : '📊 สถิติการมาสายแยกตามวันในสัปดาห์ (Day of Week Analysis)';
+
+  // Re-render data tables to switch row texts if already loaded
+  if (AppState.processedRecords && AppState.processedRecords.length > 0) {
+    recalculateAndRenderAll();
+  }
 }
 
 /**
@@ -590,7 +740,7 @@ function recalculateAndRenderAll() {
     let isLate = false;
     let lateMinutes = 0;
     let allowance = 0;
-    let statusText = 'วันหยุด/ไม่เข้างาน';
+    let statusText = AppState.lang === 'en' ? 'Day Off / No Shift' : 'วันหยุด/ไม่เข้างาน';
 
     if (clockInInfo.seconds > 0 || actualHours > 0) {
       const allowedCeiling = targetSeconds + AppState.lateToleranceSec;
@@ -599,13 +749,13 @@ function recalculateAndRenderAll() {
         isLate = true;
         lateMinutes = Math.ceil((clockInInfo.seconds - targetSeconds) / 60);
         allowance = 0; // อดค่าข้าว 25 บาท!
-        statusText = `❌ สาย ${lateMinutes} นาที`;
+        statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m` : `❌ สาย ${lateMinutes} นาที`;
         totalLateDays++;
       } else {
         isLate = false;
         lateMinutes = 0;
         allowance = 25; // ได้ค่าข้าว 25 บาท!
-        statusText = '✅ ตรงเวลา';
+        statusText = AppState.lang === 'en' ? '✅ On Time (+25฿)' : '✅ ตรงเวลา (+25฿)';
         totalOntimeDays++;
       }
     }
@@ -615,8 +765,8 @@ function recalculateAndRenderAll() {
       empName,
       dateStr,
       dayOfWeek,
-      dayNameShort: THAI_DAYS_SHORT[dayOfWeek],
-      dayNameFull: THAI_DAYS_FULL[dayOfWeek],
+      dayNameShort: AppState.lang === 'en' ? ENG_DAYS_SHORT[dayOfWeek] : THAI_DAYS_SHORT[dayOfWeek],
+      dayNameFull: AppState.lang === 'en' ? ENG_DAYS_FULL[dayOfWeek] : THAI_DAYS_FULL[dayOfWeek],
       dwsCode,
       dwsText,
       clockInStr: clockInInfo.str,
@@ -628,7 +778,7 @@ function recalculateAndRenderAll() {
       totalOT,
       isFriday,
       isPreHoliday,
-      preHolidayReason: preHolidayReason || (isFriday ? 'กะวันศุกร์ (เข้า 07:00)' : ''),
+      preHolidayReason: preHolidayReason || (isFriday ? (AppState.lang === 'en' ? 'Friday Shift (07:00)' : 'กะวันศุกร์ (เข้า 07:00)') : ''),
       isLate,
       lateMinutes,
       allowance,
@@ -760,7 +910,7 @@ function renderSummaryTable() {
       <td class="text-center">${emp.totalActualHours.toFixed(1)}</td>
       <td class="text-center">${emp.totalOTHours.toFixed(1)}</td>
       <td class="text-center">
-        <button class="btn btn-outline btn-xs" onclick="openEmployeeModal('${emp.empId}')">🔍 ดูประวัติรายวัน</button>
+        <button class="btn btn-outline btn-xs" onclick="openEmployeeModal('${emp.empId}')">${AppState.lang === 'en' ? '🔍 View History' : '🔍 ดูประวัติรายวัน'}</button>
       </td>
     </tr>
   `).join('');
@@ -812,11 +962,14 @@ function renderDailyTable() {
   const startIdx = (AppState.dailyPage - 1) * AppState.dailyPerPage;
   const pageRecords = records.slice(startIdx, startIdx + AppState.dailyPerPage);
 
-  document.getElementById('daily-filter-stats').textContent = `แสดงผล: ${startIdx + 1} - ${Math.min(startIdx + AppState.dailyPerPage, totalItems)} จากทั้งหมด ${totalItems.toLocaleString()} รายการ`;
+  const endCount = Math.min(startIdx + AppState.dailyPerPage, totalItems);
+  document.getElementById('daily-filter-stats').textContent = AppState.lang === 'en'
+    ? `Showing: ${startIdx + 1} - ${endCount} of ${totalItems.toLocaleString()} records`
+    : `แสดงผล: ${startIdx + 1} - ${endCount} จากทั้งหมด ${totalItems.toLocaleString()} รายการ`;
   renderPaginationControls(totalPages);
 
   if (pageRecords.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="12" class="text-center py-4">🔍 ไม่พบรายการเข้า-ออกงานที่ตรงกับเงื่อนไข</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="text-center py-4">🔍 ${AppState.lang === 'en' ? 'No attendance records match the filters' : 'ไม่พบรายการเข้า-ออกงานที่ตรงกับเงื่อนไข'}</td></tr>`;
     return;
   }
 
@@ -899,10 +1052,10 @@ function renderHolidaysTable(filterType = 'all') {
   if (filterType === 'official') list = list.filter(h => h.type === 'official');
   else if (filterType === 'preholiday') list = list.filter(h => h.type === 'preholiday');
 
-  document.getElementById('total-holiday-badge').textContent = `รวม ${list.length} วัน`;
+  document.getElementById('total-holiday-badge').textContent = AppState.lang === 'en' ? `Total ${list.length} Days` : `รวม ${list.length} วัน`;
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4">ไม่พบรายการวันหยุดที่ตรงกับตัวกรอง</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4">${AppState.lang === 'en' ? 'No holiday records found matching filter' : 'ไม่พบรายการวันหยุดที่ตรงกับตัวกรอง'}</td></tr>`;
     return;
   }
 
@@ -912,16 +1065,16 @@ function renderHolidaysTable(filterType = 'all') {
   const html = sorted.map((h, i) => {
     const isPre = h.type === 'preholiday';
     const dtObj = new Date(h.date);
-    const dayName = THAI_DAYS_FULL[dtObj.getDay()];
+    const dayName = AppState.lang === 'en' ? ENG_DAYS_FULL[dtObj.getDay()] : THAI_DAYS_FULL[dtObj.getDay()];
 
     return `
       <tr>
         <td><strong>${h.date}</strong> <span class="text-secondary">(${dayName})</span></td>
-        <td><span class="badge ${isPre ? 'badge-accent' : 'badge-primary'}">${isPre ? '🌟 วันก่อนหยุด' : '🎉 วันหยุดราชการ'}</span></td>
+        <td><span class="badge ${isPre ? 'badge-accent' : 'badge-primary'}">${isPre ? (AppState.lang === 'en' ? '🌟 Pre-Holiday' : '🌟 วันก่อนหยุด') : (AppState.lang === 'en' ? '🎉 Official Holiday' : '🎉 วันหยุดราชการ')}</span></td>
         <td>${h.name}</td>
-        <td class="font-mono ${isPre ? 'text-accent font-bold' : 'text-muted'}">${isPre ? '07:00 - 16:00 น.' : 'หยุดบริษัท'}</td>
+        <td class="font-mono ${isPre ? 'text-accent font-bold' : 'text-muted'}">${isPre ? (AppState.lang === 'en' ? '07:00 - 16:00 Target' : '07:00 - 16:00 น.') : (AppState.lang === 'en' ? 'Company Closed' : 'หยุดบริษัท')}</td>
         <td class="text-center">
-          <button class="btn btn-text btn-xs text-danger" onclick="deleteHoliday('${h.date}', '${h.type}')" title="ลบรายการนี้">🗑️ ลบ</button>
+          <button class="btn btn-text btn-xs text-danger" onclick="deleteHoliday('${h.date}', '${h.type}')" title="ลบรายการนี้">${AppState.lang === 'en' ? '🗑️ Delete' : '🗑️ ลบ'}</button>
         </td>
       </tr>
     `;
@@ -950,6 +1103,7 @@ function renderInsightsTab() {
     return b.ontimeDays - a.ontimeDays;
   }).slice(0, 10);
 
+  const dayUnit = AppState.lang === 'en' ? 'Days' : 'วัน';
   document.getElementById('top-ontime-tbody').innerHTML = topOntime.map((e, idx) => {
     const rate = Math.round((e.ontimeDays / e.totalDaysWorked) * 100);
     let medal = `${idx + 1}.`;
@@ -961,7 +1115,7 @@ function renderInsightsTab() {
       <tr>
         <td class="font-bold">${medal}</td>
         <td><strong>${e.empName}</strong> <span class="text-muted">(${e.empId})</span></td>
-        <td class="text-center text-success font-semibold">${e.ontimeDays} วัน</td>
+        <td class="text-center text-success font-semibold">${e.ontimeDays} ${dayUnit}</td>
         <td class="text-center"><span class="badge badge-success">${rate}%</span></td>
         <td class="text-right font-bold text-accent">${e.totalAllowance.toLocaleString()} ฿</td>
       </tr>
@@ -978,12 +1132,12 @@ function renderInsightsTab() {
       <tr>
         <td class="font-bold text-danger">${idx + 1}.</td>
         <td><strong>${e.empName}</strong> <span class="text-muted">(${e.empId})</span></td>
-        <td class="text-center text-danger font-bold">${e.lateDays} วัน</td>
+        <td class="text-center text-danger font-bold">${e.lateDays} ${dayUnit}</td>
         <td class="text-center"><span class="badge badge-danger">${rate}%</span></td>
         <td class="text-right font-bold text-danger">-${lostAllowance.toLocaleString()} ฿</td>
       </tr>
     `;
-  }).join('') : `<tr><td colspan="5" class="text-center text-success py-3">🎉 ไม่มีพนักงานมาสายในรอบข้อมูลนี้</td></tr>`;
+  }).join('') : `<tr><td colspan="5" class="text-center text-success py-3">${AppState.lang === 'en' ? '🎉 No employees were late in this period!' : '🎉 ไม่มีพนักงานมาสายในรอบข้อมูลนี้'}</td></tr>`;
 
   // Day of week late stats
   const dowLateCounts = [0, 0, 0, 0, 0, 0, 0];
@@ -1006,14 +1160,16 @@ function renderInsightsTab() {
     const totals = dowTotalCounts[d];
     const pct = totals > 0 ? Math.round((lates / totals) * 100) : 0;
     const barHeight = Math.round((lates / maxLate) * 140) + 10;
+    const label = AppState.lang === 'en' ? ENG_DAYS_FULL[d] : THAI_DAYS_FULL[d];
+    const lateWord = AppState.lang === 'en' ? 'Late' : 'สาย';
 
     return `
       <div class="dow-bar-col">
-        <span class="dow-value" title="${lates} ครั้ง (${pct}%)">${lates} สาย</span>
+        <span class="dow-value" title="${lates} (${pct}%)">${lates} ${lateWord}</span>
         <div class="dow-bar-wrap">
           <div class="dow-bar-inner" style="height: ${barHeight}px;"></div>
         </div>
-        <span class="dow-label">${THAI_DAYS_FULL[d]}</span>
+        <span class="dow-label">${label}</span>
       </div>
     `;
   }).join('');
@@ -1028,12 +1184,13 @@ function openEmployeeModal(empId) {
 
   AppState.selectedEmployeeForModal = emp;
 
-  document.getElementById('modal-emp-title').textContent = `👤 ประวัติเวลาเข้า-ออกงาน : ${emp.empName}`;
-  document.getElementById('modal-emp-sub').textContent = `รหัสพนักงาน: ${emp.empId} | แผนก: ${emp.dept}`;
+  document.getElementById('modal-emp-title').textContent = AppState.lang === 'en' ? `👤 Attendance History : ${emp.empName}` : `👤 ประวัติเวลาเข้า-ออกงาน : ${emp.empName}`;
+  document.getElementById('modal-emp-sub').textContent = AppState.lang === 'en' ? `Employee ID: ${emp.empId} | Dept: ${emp.dept}` : `รหัสพนักงาน: ${emp.empId} | แผนก: ${emp.dept}`;
 
-  document.getElementById('m-stat-total').textContent = `${emp.totalDaysWorked} วัน`;
-  document.getElementById('m-stat-ontime').textContent = `${emp.ontimeDays} วัน`;
-  document.getElementById('m-stat-late').textContent = `${emp.lateDays} วัน`;
+  const dayUnit = AppState.lang === 'en' ? 'Days' : 'วัน';
+  document.getElementById('m-stat-total').textContent = `${emp.totalDaysWorked} ${dayUnit}`;
+  document.getElementById('m-stat-ontime').textContent = `${emp.ontimeDays} ${dayUnit}`;
+  document.getElementById('m-stat-late').textContent = `${emp.lateDays} ${dayUnit}`;
   document.getElementById('m-stat-allowance').textContent = `${emp.totalAllowance.toLocaleString()} ฿`;
 
   // Sort employee records by date descending
@@ -1047,7 +1204,7 @@ function openEmployeeModal(empId) {
 
     let allowanceText = '-';
     if (r.allowance === 25) allowanceText = `<strong class="text-success">+25 ฿</strong>`;
-    else if (r.isLate) allowanceText = `<span class="badge badge-danger">0 ฿ (สาย)</span>`;
+    else if (r.isLate) allowanceText = `<span class="badge badge-danger">${AppState.lang === 'en' ? '0 ฿ (Late)' : '0 ฿ (สาย)'}</span>`;
 
     return `
       <tr>
