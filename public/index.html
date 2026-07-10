@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR-Time Portal : Workshop Attendance & Allowance Engine</title>
+  <!-- Google Fonts: Outfit & Inter & Noto Sans Thai -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  <!-- SheetJS CDN for fast client-side Excel export and secondary parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="theme-dark">
+  <!-- Ambient Glow Background -->
+  <div class="ambient-bg">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+  </div>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <div class="navbar-container">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>HR-Time Workshop Portal</h1>
+          <p>ระบบคำนวณเวลาเข้า-ออกงาน workshop และค่าข้าวพนักงานอัตโนมัติ</p>
+        </div>
+      </div>
+      
+      <div class="navbar-actions">
+        <!-- Quick Status Pills -->
+        <div class="status-pill status-mode" title="โหมดการคำนวณปัจจุบัน">
+          <span class="pill-dot pulse-green"></span>
+          <span id="current-mode-badge">กฎ Workshop (08:00/07:00)</span>
+        </div>
+        <div class="status-pill status-records">
+          <span>📑 รายการข้อมูล: <strong id="nav-total-records">กำลังโหลด...</strong></span>
+        </div>
+        
+        <!-- Theme Toggle Button -->
+        <button class="btn-icon theme-toggle-btn" id="theme-toggle" title="เปลี่ยนโหมดมืด/สว่าง">
+          <span class="theme-icon-dark">🌙</span>
+          <span class="theme-icon-light">☀️</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-container">
+    
+    <!-- Hero Control & Upload Banner -->
+    <section class="hero-control-panel">
+      <div class="panel-grid">
+        <!-- Card 1: Data Source & Upload -->
+        <div class="control-box upload-box">
+          <div class="box-header">
+            <h3>📂 แหล่งข้อมูลการแตะบัตร (Excel Data Source)</h3>
+            <span class="badge badge-primary" id="source-status-badge">Default Pre-loaded</span>
+          </div>
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" hidden>
+            <div class="dropzone-content">
+              <span class="drop-icon">📊</span>
+              <div class="drop-text">
+                <p class="primary-drop-text">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์ <strong>Clock in and out.xlsx</strong> มาวางที่นี่</p>
+                <p class="secondary-drop-text">รองรับข้อมูลจากไฟล์เครื่องรูดบัตร/แตะบัตร (.xlsx, .xls, .csv)</p>
+              </div>
+              <button class="btn btn-outline btn-sm" id="btn-trigger-upload">เลือกไฟล์ Excel</button>
+            </div>
+          </div>
+          <div class="file-action-row">
+            <span class="current-file-name" id="current-file-display">📑 ไฟล์ปัจจุบัน: Clock in and out_01.01.26 to 30.06.26.xlsx</span>
+            <button class="btn btn-text btn-xs" id="btn-reload-default" title="รีโหลดข้อมูลเริ่มต้น">🔄 โหลดไฟล์บริษัทเริ่มต้น</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Calculation Engine Rules -->
+        <div class="control-box rules-box">
+          <div class="box-header">
+            <h3>⚙️ หลักเกณฑ์และกฎคำนวณค่าข้าววันละ 25 บาท</h3>
+            <button class="btn btn-xs btn-accent" id="btn-open-holidays">🏢 ตั้งค่าวันหยุดบริษัท</button>
+          </div>
+          
+          <!-- Mode Selection -->
+          <div class="rule-group">
+            <label class="rule-label">👉 เลือกโหมดการคำนวณเวลาเข้างาน:</label>
+            <div class="mode-toggle-group">
+              <button class="mode-btn active" data-mode="workshop">
+                <span class="mode-title">⭐ โหมด Workshop มาตรฐาน</span>
+                <span class="mode-desc">จ-พฤ เข้า 08:00 น. | ศ และก่อนวันหยุด เข้า 07:00 น.</span>
+              </button>
+              <button class="mode-btn" data-mode="dws">
+                <span class="mode-title">📋 โหมดตารางงาน (DWS Column)</span>
+                <span class="mode-desc">อ้างอิงเวลาเข้าจากคอลัมน์ Daily Work Schedule ในไฟล์</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Late Tolerance Selection -->
+          <div class="rule-group tolerance-group">
+            <label class="rule-label">🕒 เกณฑ์เวลาสาย (Late Threshold):</label>
+            <div class="tolerance-pills">
+              <button class="pill-btn" data-tolerance="0">ตรงเวลาเป๊ะ (0 นาที)</button>
+              <button class="pill-btn active" data-tolerance="60">เกิน 1 นาที (=สาย อดค่าข้าว)</button>
+              <button class="pill-btn" data-tolerance="300">ผ่อนผัน 5 นาที</button>
+              <button class="pill-btn" data-tolerance="900">ผ่อนผัน 15 นาที</button>
+            </div>
+          </div>
+
+          <!-- Quick Rule Summary Card -->
+          <div class="rule-hint-box">
+            <div class="hint-icon">ℹ️</div>
+            <div class="hint-text">
+              <strong>กฎการได้ค่าข้าว 25฿:</strong> พนักงานต้องเข้างานไม่เกินเวลาเป้าหมาย + เกณฑ์ผ่อนผัน (<span id="hint-target-text">จ-พฤ 08:01 น., ศ และก่อนวันหยุด 07:01 น.</span>) หากมาสายแม้แต่ 1 วินาที อดค่าข้าวในวันนั้นทันที
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Analytics Dashboard KPI Cards -->
+    <section class="kpi-grid" id="kpi-section">
+      <div class="kpi-card kpi-emp">
+        <div class="kpi-icon-wrap"><span class="kpi-icon">👥</span></div>
+        <div class="kpi-data">
+          <span class="kpi-label">พนักงานทั้งหมด (Employees)</span>
+          <h2 class="kpi-value" id="kpi-total-emps">0 <span class="kpi-unit">คน</span></h2>
+          <span class="kpi-sub">ที่ปรากฏในรอบข้อมูลนี้</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-records">
+        <div class="kpi-icon-wrap"><span class="kpi-icon">📅</span></div>
+        <div class="kpi-data">
+          <span class="kpi-label">รายการบันทึกเวลา (Punch Records)</span>
+          <h2 class="kpi-value" id="kpi-total-records">0 <span class="kpi-unit">รายการ</span></h2>
+          <span class="kpi-sub">ตั้งแต่ <span id="kpi-date-range">-</span></span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-allowance highlight-card">
+        <div class="kpi-icon-wrap"><span class="kpi-icon">🍚</span></div>
+        <div class="kpi-data">
+          <span class="kpi-label">ยอดเบิกค่าข้าวรวม (Total Allowance)</span>
+          <h2 class="kpi-value" id="kpi-total-allowance">0 <span class="kpi-unit">฿</span></h2>
+          <span class="kpi-sub">จาก <span id="kpi-ontime-days">0</span> วันทำงานที่ตรงเวลา</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-rate">
+        <div class="kpi-icon-wrap"><span class="kpi-icon">⏱️</span></div>
+        <div class="kpi-data">
+          <span class="kpi-label">อัตราเข้าตรงเวลา vs มาสาย</span>
+          <h2 class="kpi-value" id="kpi-ontime-rate">0% <span class="kpi-unit">ตรงเวลา</span></h2>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-inner" id="kpi-progress-bar" style="width: 0%"></div>
+          </div>
+          <span class="kpi-sub" id="kpi-late-count-sub">สาย 0 ครั้ง</span>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-preholiday">
+        <div class="kpi-icon-wrap"><span class="kpi-icon">🌟</span></div>
+        <div class="kpi-data">
+          <span class="kpi-label">กะวันศุกร์และก่อนวันหยุด (07:00 น.)</span>
+          <h2 class="kpi-value" id="kpi-preholiday-count">0 <span class="kpi-unit">รายการ</span></h2>
+          <span class="kpi-sub">ใช้เกณฑ์เข้างาน 07:00 - 16:00 น.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Navigation Tabs -->
+    <section class="workspace-section">
+      <div class="tabs-header">
+        <div class="tab-list">
+          <button class="tab-btn active" data-tab="tab-summary">
+            <span class="tab-icon">📋</span>
+            <span>1. สรุปรายบุคคล & ยอดเบิกค่าข้าว</span>
+            <span class="tab-badge" id="tab-emp-count">0</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-daily">
+            <span class="tab-icon">🕒</span>
+            <span>2. บันทึกเวลาเข้า-ออกงานรายวัน</span>
+            <span class="tab-badge" id="tab-daily-count">0</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-holidays">
+            <span class="tab-icon">🏢</span>
+            <span>3. ปฏิทินวันหยุด & วันก่อนหยุดบริษัท</span>
+            <span class="tab-badge badge-accent" id="tab-holiday-count">18</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-insights">
+            <span class="tab-icon">📈</span>
+            <span>4. วิเคราะห์สถิติ & อันดับความตรงเวลา</span>
+          </button>
+        </div>
+        
+        <div class="tabs-toolbar">
+          <button class="btn btn-secondary btn-sm" id="btn-print-summary" title="พิมพ์สรุปใบเบิกค่าข้าวหรือบันทึกเป็น PDF">
+            🖨️ พิมพ์ใบสรุป / PDF
+          </button>
+          <div class="dropdown">
+            <button class="btn btn-primary btn-sm dropdown-toggle" id="btn-export-dropdown">
+              📥 Export ข้อมูล (Excel/CSV)
+            </button>
+            <div class="dropdown-menu" id="export-menu">
+              <a href="#" class="dropdown-item" id="export-summary-xlsx">📊 Export สรุปค่าข้าวรายบุคคล (.xlsx)</a>
+              <a href="#" class="dropdown-item" id="export-daily-xlsx">📋 Export รายการเข้า-ออกรายวัน (.xlsx)</a>
+              <a href="#" class="dropdown-item" id="export-summary-csv">📄 Export สรุปรายบุคคล (.csv)</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 1: EMPLOYEE SUMMARY & PAYROLL ALLOWANCE -->
+      <div class="tab-content active" id="tab-summary">
+        <div class="filter-toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="summary-search-input" placeholder="ค้นหารหัสพนักงาน, ชื่อ-นามสกุล...">
+          </div>
+          <div class="filter-controls">
+            <select id="summary-dept-filter" class="form-select">
+              <option value="all">🏢 ทุกแผนก (All Departments)</option>
+            </select>
+            <select id="summary-sort-select" class="form-select">
+              <option value="id-asc">🔤 เรียงตามรหัสพนักงาน (ID น้อยไปมาก)</option>
+              <option value="allowance-desc">💰 เรียงตามยอดได้ค่าข้าว (มากไปน้อย)</option>
+              <option value="late-desc">🚨 เรียงตามจำนวนครั้งที่มาสาย (มากไปน้อย)</option>
+              <option value="name-asc">👤 เรียงตามชื่อพนักงาน (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="summary-table">
+            <thead>
+              <tr>
+                <th>รหัส</th>
+                <th>ชื่อ-นามสกุลพนักงาน</th>
+                <th>แผนก</th>
+                <th class="text-center">วันทำงานรวม</th>
+                <th class="text-center">ตรงเวลา (วัน)</th>
+                <th class="text-center">มาสาย (วัน)</th>
+                <th class="text-center">กะ 07:00 (ศ/ก่อนหยุด)</th>
+                <th class="text-right highlight-col">ค่าข้าวยอดรวม (฿)</th>
+                <th class="text-center">ชม. ทำงานจริง</th>
+                <th class="text-center">ชม. OT</th>
+                <th class="text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="summary-tbody">
+              <tr>
+                <td colspan="11" class="text-center loading-cell">⏳ กำลังประมวลผลข้อมูล...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: DETAILED DAILY ATTENDANCE LOGS -->
+      <div class="tab-content" id="tab-daily">
+        <div class="filter-toolbar multi-row-filter">
+          <div class="filter-row">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="daily-search-input" placeholder="ค้นหาชื่อ, รหัส, วันที่ (YYYY-MM-DD)...">
+            </div>
+            <select id="daily-month-filter" class="form-select">
+              <option value="all">🗓️ ทุกเดือน (ม.ค. - มิ.ย. 2026)</option>
+              <option value="1">เดือนมกราคม 2026</option>
+              <option value="2">เดือนกุมภาพันธ์ 2026</option>
+              <option value="3">เดือนมีนาคม 2026</option>
+              <option value="4">เดือนเมษายน 2026</option>
+              <option value="5">เดือนพฤษภาคม 2026</option>
+              <option value="6">เดือนมิถุนายน 2026</option>
+            </select>
+            <select id="daily-status-filter" class="form-select">
+              <option value="all">⚡ ทุกสถานะ (All Records)</option>
+              <option value="ontime">✅ เฉพาะคนตรงเวลา (ได้ค่าข้าว +25฿)</option>
+              <option value="late">❌ เฉพาะคนมาสาย (อดค่าข้าว 0฿)</option>
+              <option value="preholiday">🌟 เฉพาะวันศุกร์และก่อนวันหยุด (เข้า 07:00)</option>
+              <option value="ot">🔥 เฉพาะวันที่มีทำ OT</option>
+            </select>
+          </div>
+          <div class="filter-row quick-stats-row">
+            <span id="daily-filter-stats">แสดงผล: 0 / 0 รายการ</span>
+            <div class="pagination-controls" id="daily-pagination">
+              <!-- Pagination dynamic -->
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table daily-table" id="daily-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>วันในสัปดาห์</th>
+                <th>รหัส</th>
+                <th>ชื่อ-นามสกุลพนักงาน</th>
+                <th>กะงาน (DWS)</th>
+                <th>เวลาเข้าจริง</th>
+                <th>เป้าหมายเข้า</th>
+                <th>เวลาออกจริง</th>
+                <th class="text-center">ชั่วโมง</th>
+                <th class="text-center">OT รวม</th>
+                <th class="text-center">สถานะสาย</th>
+                <th class="text-center highlight-col">ค่าข้าว</th>
+              </tr>
+            </thead>
+            <tbody id="daily-tbody">
+              <tr>
+                <td colspan="12" class="text-center loading-cell">⏳ กำลังประมวลผลข้อมูล...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 3: HOLIDAY & PRE-HOLIDAY MANAGER -->
+      <div class="tab-content" id="tab-holidays">
+        <div class="holidays-grid">
+          <!-- Left Column: Add Holiday Form & Explainer -->
+          <div class="holiday-form-panel">
+            <div class="panel-card">
+              <h3>➕ เพิ่มวันหยุดบริษัทใหม่ (Add Holiday)</h3>
+              <p class="panel-sub">เมื่อกำหนดวันหยุด ระบบจะสร้าง <strong>"วันทำการก่อนหน้า" (Pre-Holiday)</strong> ให้เข้างานเวลา 07:00-16:00 โดยอัตโนมัติ</p>
+              
+              <form id="add-holiday-form">
+                <div class="form-group">
+                  <label for="holiday-date-input">วันที่หยุด (Date):</label>
+                  <input type="date" id="holiday-date-input" class="form-input" required value="2026-07-30">
+                </div>
+                <div class="form-group">
+                  <label for="holiday-name-input">ชื่อวันหยุด / โอกาส (Description):</label>
+                  <input type="text" id="holiday-name-input" class="form-input" placeholder="เช่น วันหยุดพิเศษประจำปี, Outing บริษัท" required>
+                </div>
+                <div class="form-group checkbox-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="holiday-auto-pre" checked>
+                    <span>คำนวณและสร้าง "วันก่อนวันหยุด" (Pre-Holiday 07:00) ให้อัตโนมัติ</span>
+                  </label>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">บันทึกเพิ่มวันหยุดบริษัท</button>
+              </form>
+            </div>
+
+            <!-- Manual Pre-Holiday Add Box -->
+            <div class="panel-card mt-4">
+              <h3>🌟 เพิ่มวันก่อนหยุดพิเศษ / วันเข้า 07:00 แมนนวล</h3>
+              <p class="panel-sub">สำหรับกรณีต้องการบังคับให้วันใดก็ตามเปลี่ยนเกณฑ์เวลาเข้างานเป็น 07:00 น.</p>
+              <form id="add-preholiday-form" class="compact-form">
+                <input type="date" id="preholiday-date-input" class="form-input" required value="2026-04-10">
+                <input type="text" id="preholiday-name-input" class="form-input" placeholder="เหตุผล เช่น ก่อนหยุดยาวสงกรานต์" required>
+                <button type="submit" class="btn btn-accent btn-sm">+ เพิ่มวันเข้า 07:00</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Right Column: Holidays & Pre-Holidays Table -->
+          <div class="holiday-list-panel">
+            <div class="panel-card">
+              <div class="card-title-row">
+                <h3>🗓️ รายการวันหยุดและวันก่อนวันหยุดบริษัท ปี 2026</h3>
+                <span class="badge badge-secondary" id="total-holiday-badge">รวม 0 วัน</span>
+              </div>
+              <div class="holiday-filter-pills mb-3">
+                <button class="badge-pill-btn active" data-filter="all">ทั้งหมด</button>
+                <button class="badge-pill-btn" data-filter="official">🎉 วันหยุดราชการ/บริษัท</button>
+                <button class="badge-pill-btn" data-filter="preholiday">🌟 วันก่อนหยุด (เข้า 07:00)</button>
+              </div>
+              <div class="table-container max-h-500">
+                <table class="data-table compact-table">
+                  <thead>
+                    <tr>
+                      <th>วันที่</th>
+                      <th>ประเภท</th>
+                      <th>ชื่อรายการ / เหตุผล</th>
+                      <th>เวลาเข้างานกำหนด</th>
+                      <th class="text-center">ลบ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="holidays-tbody">
+                    <!-- Dynamic rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: INSIGHTS & ANALYTICS -->
+      <div class="tab-content" id="tab-insights">
+        <div class="insights-grid">
+          <!-- Top Punctual Employees -->
+          <div class="insight-box top-ontime">
+            <div class="box-header">
+              <h3>🏆 Top 10 พนักงานเข้างานตรงเวลาที่สุด</h3>
+              <span class="badge badge-success">Best Punctuality</span>
+            </div>
+            <table class="data-table rank-table">
+              <thead>
+                <tr>
+                  <th>อันดับ</th>
+                  <th>พนักงาน</th>
+                  <th class="text-center">ตรงเวลา (วัน)</th>
+                  <th class="text-center">อัตราตรงเวลา</th>
+                  <th class="text-right">ค่าข้าวสะสม</th>
+                </tr>
+              </thead>
+              <tbody id="top-ontime-tbody">
+                <!-- Dynamic -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Top Late Employees -->
+          <div class="insight-box top-late">
+            <div class="box-header">
+              <h3>🚨 Top 10 พนักงานมาสายบ่อยที่สุด (ตรวจสอบ)</h3>
+              <span class="badge badge-danger">Needs Attention</span>
+            </div>
+            <table class="data-table rank-table">
+              <thead>
+                <tr>
+                  <th>อันดับ</th>
+                  <th>พนักงาน</th>
+                  <th class="text-center">มาสาย (วัน)</th>
+                  <th class="text-center">อัตรามาสาย</th>
+                  <th class="text-right">อดค่าข้าว (วัน)</th>
+                </tr>
+              </thead>
+              <tbody id="top-late-tbody">
+                <!-- Dynamic -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Day of Week Breakdown -->
+          <div class="insight-box full-width-box">
+            <div class="box-header">
+              <h3>📊 สถิติการมาสายแยกตามวันในสัปดาห์ (Day of Week Analysis)</h3>
+              <span class="panel-sub">ช่วยวิเคราะห์ว่าพนักงานมักจะมาสายในวันจันทร์ วันกลางสัปดาห์ หรือวันศุกร์มากที่สุด</span>
+            </div>
+            <div class="dow-chart-container" id="dow-chart">
+              <!-- Dynamic day bars -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- EMPLOYEE DAILY LOG MODAL -->
+  <div class="modal-backdrop" id="emp-modal-backdrop">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3 id="modal-emp-title">👤 ประวัติเวลาเข้า-ออกงาน : Thanaphon Thaweekhun</h3>
+          <p class="modal-sub" id="modal-emp-sub">รหัสพนักงาน: 21977 | แผนก: Warehouse</p>
+        </div>
+        <button class="btn-close" id="btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-stats-row">
+          <div class="m-stat"><span class="label">วันทำงานรวม:</span> <strong id="m-stat-total">0 วัน</strong></div>
+          <div class="m-stat"><span class="label">ตรงเวลา (+25฿):</span> <strong id="m-stat-ontime" class="text-success">0 วัน</strong></div>
+          <div class="m-stat"><span class="label">มาสาย (0฿):</span> <strong id="m-stat-late" class="text-danger">0 วัน</strong></div>
+          <div class="m-stat"><span class="label">ยอดได้ค่าข้าวรวม:</span> <strong id="m-stat-allowance" class="text-accent">0 ฿</strong></div>
+        </div>
+        <div class="table-container modal-table-wrap">
+          <table class="data-table compact-table" id="modal-daily-table">
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>วันในสัปดาห์</th>
+                <th>กะงาน (DWS)</th>
+                <th>เข้าจริง</th>
+                <th>เป้าหมาย</th>
+                <th>ออกจริง</th>
+                <th class="text-center">ชม. / OT</th>
+                <th class="text-center">สถานะ</th>
+                <th class="text-right">ค่าข้าว</th>
+              </tr>
+            </thead>
+            <tbody id="modal-tbody">
+              <!-- Dynamic -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btn-export-emp-modal">📄 Export ประวัตินี้ (.xlsx)</button>
+        <button class="btn btn-primary btn-sm" id="btn-close-modal-footer">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINT PAYROLL SUMMARY HIDDEN AREA -->
+  <div id="print-area" class="print-only">
+    <div class="print-header">
+      <h2>รายงานสรุปการเบิกจ่ายค่าข้าวพนักงาน Workshop (วันละ 25 บาท)</h2>
+      <p>บริษัท: HR Workshop Attendance Report | รอบข้อมูล: <span id="print-date-range">2026-01-01 ถึง 2026-06-30</span></p>
+      <p>เงื่อนไขการเบิก: ทำงานวันละ 8 ชม. จ-พฤ เข้า 08:00 น. | ศ-ก่อนหยุด เข้า 07:00 น. (เกิน 1 นาทีถือว่าสาย อดค่าข้าว)</p>
+    </div>
+    <table class="print-table" id="print-summary-table">
+      <thead>
+        <tr>
+          <th>ลำดับ</th>
+          <th>รหัสพนักงาน</th>
+          <th>ชื่อ-นามสกุล</th>
+          <th>แผนก</th>
+          <th class="text-center">วันทำงาน</th>
+          <th class="text-center">ตรงเวลา (วัน)</th>
+          <th class="text-center">มาสาย (วัน)</th>
+          <th class="text-right">ยอดเบิกค่าข้าว (฿)</th>
+          <th>ลายมือชื่อพนักงาน</th>
+        </tr>
+      </thead>
+      <tbody id="print-tbody">
+        <!-- Dynamic -->
+      </tbody>
+    </table>
+    <div class="print-footer mt-5">
+      <div class="sign-box">
+        <p>ผู้จัดทำรายงาน: ............................................</p>
+        <p>วันที่: ............................................</p>
+      </div>
+      <div class="sign-box">
+        <p>ผู้อนุมัติฝ่ายทรัพยากรบุคคล: ............................................</p>
+        <p>วันที่: ............................................</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript -->
+  <script src="js/app.js"></script>
+</body>
+</html>
