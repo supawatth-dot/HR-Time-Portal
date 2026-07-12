@@ -363,9 +363,9 @@ function applyLanguage() {
 
   // Summary Table Headers
   const sumThs = document.querySelectorAll('#summary-table thead tr th');
-  if (sumThs.length >= 11) {
-    const enSum = ['ID', 'Employee Name', 'Department', 'Worked Days', 'On Time (Days)', 'Late (Days)', '07:00 Shift (Fri/Pre)', 'Total Allowance (฿)', 'Actual Hrs', 'Total OT', 'Actions'];
-    const thSum = ['รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'วันทำงานรวม', 'ตรงเวลา (วัน)', 'มาสาย (วัน)', 'กะ 07:00 (ศ/ก่อนหยุด)', 'ค่าข้าวยอดรวม (฿)', 'ชม. ทำงานจริง', 'ชม. OT', 'จัดการ'];
+  if (sumThs.length >= 12) {
+    const enSum = ['ID', 'Employee Name', 'Department', 'Worked Days', 'On Time (Days)', 'Late (Days)', '07:00 Shift (Fri/Pre)', 'Leave (Days)', 'Total Allowance (฿)', 'Actual Hrs', 'Total OT', 'Actions'];
+    const thSum = ['รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'วันทำงานรวม', 'ตรงเวลา (วัน)', 'มาสาย (วัน)', 'กะ 07:00 (ศ/ก่อนหยุด)', 'สรุปการลา', 'ค่าข้าวยอดรวม (฿)', 'ชม. ทำงานจริง', 'ชม. OT', 'จัดการ'];
     sumThs.forEach((th, idx) => { th.textContent = isEn ? enSum[idx] : thSum[idx]; });
   }
 
@@ -754,6 +754,7 @@ function recalculateAndRenderAll() {
 
     const dwsCode = String(row[3] || '').trim();
     const dwsText = String(row[4] || '').trim();
+    const leaveReason = String(row[16] || '').trim();
     const clockInInfo = excelSerialToTimeInfo(row[5]);
     const clockOutInfo = excelSerialToTimeInfo(row[6]);
     const actualHours = parseFloat(row[8]) || parseFloat(row[7]) || 0;
@@ -805,6 +806,9 @@ function recalculateAndRenderAll() {
     let lateMinutes = 0;
     let allowance = 0;
     let statusText = AppState.lang === 'en' ? 'Day Off / No Shift' : 'วันหยุด/ไม่เข้างาน';
+    if (leaveReason && clockInInfo.seconds === 0 && actualHours === 0) {
+      statusText = AppState.lang === 'en' ? 'Leave / Absence' : 'ลาหยุด';
+    }
 
     if (clockInInfo.seconds > 0 || actualHours > 0) {
       const allowedCeiling = targetSeconds + AppState.lateToleranceSec;
@@ -822,6 +826,9 @@ function recalculateAndRenderAll() {
         if (AppState.mode === 'dws' && actualHours < 8) {
           allowance = 0; // อดค่าข้าว 25 บาท! (ทำงานไม่ครบ 8 ชม.)
           statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ)';
+        } else if (leaveReason) {
+          allowance = 0; // อดค่าข้าว (มีการลา)
+          statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. Leave)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว วันลา)';
         } else {
           allowance = 25; // ได้ค่าข้าว 25 บาท!
           statusText = AppState.lang === 'en' ? '✅ On Time (+25฿)' : '✅ ตรงเวลา (+25฿)';
@@ -853,6 +860,7 @@ function recalculateAndRenderAll() {
       lateMinutes,
       allowance,
       statusText,
+      leaveReason,
       dept
     };
 
@@ -871,6 +879,7 @@ function recalculateAndRenderAll() {
         totalAllowance: 0,
         totalActualHours: 0,
         totalOTHours: 0,
+        leaveStats: {},
         records: []
       };
     }
@@ -884,6 +893,11 @@ function recalculateAndRenderAll() {
       empMap[empId].totalActualHours += actualHours;
       empMap[empId].totalOTHours += totalOT;
     }
+    
+    if (leaveReason) {
+      empMap[empId].leaveStats[leaveReason] = (empMap[empId].leaveStats[leaveReason] || 0) + 1;
+    }
+    
     empMap[empId].records.push(record);
   });
 
@@ -986,6 +1000,11 @@ function renderSummaryTable() {
       <td class="text-center text-success font-semibold">${emp.ontimeDays}</td>
       <td class="text-center ${emp.lateDays > 0 ? 'text-danger font-bold' : 'text-muted'}">${emp.lateDays}</td>
       <td class="text-center"><span class="badge badge-accent">${emp.preHolidayShifts}</span></td>
+      <td class="text-left" style="font-size:0.8rem; line-height:1.2;">
+        ${Object.keys(emp.leaveStats).length > 0 
+          ? Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap;">- ${reason}: <b>${count}</b> วัน</div>`).join('') 
+          : '<div class="text-center text-muted">-</div>'}
+      </td>
       <td class="text-right highlight-col">${emp.totalAllowance.toLocaleString()} ฿</td>
       <td class="text-center">${emp.totalActualHours.toFixed(1)}</td>
       <td class="text-center">${emp.totalOTHours.toFixed(1)}</td>
@@ -1083,7 +1102,10 @@ function renderDailyTable() {
         <td class="font-mono">${r.clockOutStr}</td>
         <td class="text-center">${r.actualHours.toFixed(1)}</td>
         <td class="text-center ${r.totalOT > 0 ? 'text-accent font-bold' : 'text-muted'}">${r.totalOT > 0 ? '+' + r.totalOT.toFixed(1) : '-'}</td>
-        <td class="text-center"><span class="badge ${statusClass}">${r.statusText}</span></td>
+        <td class="text-center">
+          <span class="badge ${statusClass}">${r.statusText}</span>
+          ${r.leaveReason ? `<br><span class="badge badge-warning mt-1" style="font-size:0.75rem; white-space:normal;">🛌 ${r.leaveReason}</span>` : ''}
+        </td>
         <td class="text-center highlight-col">${allowanceHtml}</td>
       </tr>
     `;
