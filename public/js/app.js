@@ -757,8 +757,19 @@ function recalculateAndRenderAll() {
     const leaveReason = String(row[16] || '').trim();
     const clockInInfo = excelSerialToTimeInfo(row[5]);
     const clockOutInfo = excelSerialToTimeInfo(row[6]);
-    const actualHours = parseFloat(row[8]) || parseFloat(row[7]) || 0;
+    let actualHours = parseFloat(row[8]) || parseFloat(row[7]) || 0;
     
+    // Recalculate actual hours manually (ignoring Excel's pre-calculated early cutoff)
+    if (clockInInfo.seconds > 0 && clockOutInfo.seconds > 0) {
+      let diffSecs = clockOutInfo.seconds - clockInInfo.seconds;
+      if (diffSecs < 0) diffSecs += 86400; // Crossed midnight
+      
+      let calcHours = diffSecs / 3600;
+      if (calcHours > 5) {
+        calcHours -= 1; // Deduct 1 hour lunch break
+      }
+      actualHours = calcHours;
+    }
     // Sum OT hours
     const ot1 = parseFloat(row[9]) || 0;
     const ot15 = parseFloat(row[10]) || 0;
