@@ -730,13 +730,13 @@ body.theme-light .tabs-header {
   top: 0;
   background: rgba(18, 23, 36, 0.95);
   backdrop-filter: blur(8px);
-  padding: 0.9rem 1rem;
+  padding: 0.75rem 0.5rem;
   text-align: left;
   font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 2px solid var(--border-color);
   z-index: 10;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 body.theme-light .data-table th {
@@ -744,7 +744,7 @@ body.theme-light .data-table th {
 }
 
 .data-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.6rem 0.5rem;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-primary);
   vertical-align: middle;

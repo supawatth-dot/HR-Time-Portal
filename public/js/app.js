@@ -83,7 +83,23 @@ function setupEventListeners() {
       if (AppState.mode === 'workshop') {
         badge.textContent = AppState.lang === 'en' ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
       } else {
-        badge.textContent = AppState.lang === 'en' ? 'Shift Schedule (DWS Column)' : 'กฎตามกะ (DWS Column)';
+        badge.textContent = AppState.lang === 'en' ? 'Office Mode (Before 09:00, 8hrs+)' : 'โหมด Office (ไม่เกิน 09:00, 8ชม.+)';
+      }
+      
+      // Update hint text based on mode
+      const min = Math.floor(AppState.lateToleranceSec / 60);
+      const mm = String(min).padStart(2, '0');
+      const hintSpan = document.getElementById('hint-target-text');
+      if (hintSpan) {
+        if (AppState.mode === 'workshop') {
+          hintSpan.textContent = AppState.lang === 'en' 
+            ? (min === 0 ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}`)
+            : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
+        } else {
+          hintSpan.textContent = AppState.lang === 'en'
+            ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
+            : (min === 0 ? 'ไม่เกิน 09:00 น. ตรงเป๊ะ, ทำงานครบ 8 ชม.' : `ไม่เกิน 09:${mm} น., ทำงานครบ 8 ชม.`);
+        }
       }
       recalculateAndRenderAll();
     });
@@ -99,11 +115,17 @@ function setupEventListeners() {
       // Update hint text
       const hintSpan = document.getElementById('hint-target-text');
       const min = Math.floor(AppState.lateToleranceSec / 60);
-      if (min === 0) {
-        hintSpan.textContent = AppState.lang === 'en' ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.';
-      } else {
-        const mm = String(min).padStart(2, '0');
-        hintSpan.textContent = AppState.lang === 'en' ? `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}` : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`;
+      const mm = String(min).padStart(2, '0');
+      if (hintSpan) {
+        if (AppState.mode === 'workshop') {
+          hintSpan.textContent = AppState.lang === 'en' 
+            ? (min === 0 ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}`)
+            : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
+        } else {
+          hintSpan.textContent = AppState.lang === 'en'
+            ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
+            : (min === 0 ? 'ไม่เกิน 09:00 น. ตรงเป๊ะ, ทำงานครบ 8 ชม.' : `ไม่เกิน 09:${mm} น., ทำงานครบ 8 ชม.`);
+        }
       }
       recalculateAndRenderAll();
     });
@@ -256,7 +278,7 @@ function applyLanguage() {
     if (AppState.mode === 'workshop') {
       badge.textContent = isEn ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
     } else {
-      badge.textContent = isEn ? 'Shift Schedule (DWS Column)' : 'กฎตามกะ (DWS Column)';
+      badge.textContent = isEn ? 'Office Mode (Before 09:00, 8hrs+)' : 'โหมด Office (ไม่เกิน 09:00, 8ชม.+)';
     }
   }
 
@@ -286,8 +308,8 @@ function applyLanguage() {
   const modeDescs = document.querySelectorAll('.mode-btn .mode-desc');
   if (modeTitles[0]) modeTitles[0].textContent = isEn ? '⭐ Standard Workshop Mode' : '⭐ โหมด Workshop มาตรฐาน';
   if (modeDescs[0]) modeDescs[0].textContent = isEn ? 'Mon-Thu 08:00 | Fri & Pre-Holiday 07:00' : 'จ-พฤ เข้า 08:00 น. | ศ และก่อนวันหยุด เข้า 07:00 น.';
-  if (modeTitles[1]) modeTitles[1].textContent = isEn ? '📋 Shift Schedule Mode (DWS)' : '📋 โหมดตารางงาน (DWS Column)';
-  if (modeDescs[1]) modeDescs[1].textContent = isEn ? 'Use Daily Work Schedule column from Excel' : 'อ้างอิงเวลาเข้าจากคอลัมน์ Daily Work Schedule ในไฟล์';
+  if (modeTitles[1]) modeTitles[1].textContent = isEn ? '📋 Office Mode' : '📋 โหมดพนักงานออฟฟิศ (Office)';
+  if (modeDescs[1]) modeDescs[1].textContent = isEn ? 'Clock in <= 09:00, Work >= 8h for allowance' : 'เข้างานไม่เกิน 09:00 น. ทำงานครบ 8 ชม. จะได้รับค่าข้าว';
 
   // Late tolerance pills
   const pillBtns = document.querySelectorAll('.pill-btn');
@@ -300,10 +322,15 @@ function applyLanguage() {
   const min = Math.floor(AppState.lateToleranceSec / 60);
   const hintSpan = document.getElementById('hint-target-text');
   if (hintSpan) {
-    if (min === 0) hintSpan.textContent = isEn ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.';
-    else {
-      const mm = String(min).padStart(2, '0');
-      hintSpan.textContent = isEn ? `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}` : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`;
+    const mm = String(min).padStart(2, '0');
+    if (AppState.mode === 'workshop') {
+      hintSpan.textContent = isEn 
+        ? (min === 0 ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}`)
+        : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
+    } else {
+      hintSpan.textContent = isEn
+        ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
+        : (min === 0 ? 'ไม่เกิน 09:00 น. ตรงเป๊ะ, ทำงานครบ 8 ชม.' : `ไม่เกิน 09:${mm} น., ทำงานครบ 8 ชม.`);
     }
   }
 
@@ -344,9 +371,9 @@ function applyLanguage() {
 
   // Daily Table Headers
   const dailyThs = document.querySelectorAll('#daily-table thead tr th');
-  if (dailyThs.length >= 12) {
-    const enDaily = ['Date', 'Day', 'ID', 'Employee Name', 'DWS Schedule', 'Clock In', 'Target', 'Clock Out', 'Actual Hrs', 'Total OT', 'Status', 'Allowance'];
-    const thDaily = ['วันที่', 'วันในสัปดาห์', 'รหัส', 'ชื่อ-นามสกุลพนักงาน', 'กะงาน (DWS)', 'เวลาเข้าจริง', 'เป้าหมายเข้า', 'เวลาออกจริง', 'ชั่วโมง', 'OT รวม', 'สถานะสาย', 'ค่าข้าว'];
+  if (dailyThs.length >= 13) {
+    const enDaily = ['Date', 'Day', 'ID', 'Employee Name', 'Department', 'DWS Schedule', 'Clock In', 'Target', 'Clock Out', 'Actual Hrs', 'Total OT', 'Status', 'Allowance'];
+    const thDaily = ['วันที่', 'วันในสัปดาห์', 'รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'กะงาน (DWS)', 'เวลาเข้าจริง', 'เป้าหมายเข้า', 'เวลาออกจริง', 'ชั่วโมง', 'OT รวม', 'สถานะสาย', 'ค่าข้าว'];
     dailyThs.forEach((th, idx) => { th.textContent = isEn ? enDaily[idx] : thDaily[idx]; });
   }
 
@@ -660,7 +687,7 @@ function excelSerialToTimeInfo(serialTime) {
       const ss = parts[2] || 0;
       const totalSeconds = hh * 3600 + mm * 60 + ss;
       return {
-        str: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`,
+        str: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
         seconds: totalSeconds
       };
     }
@@ -675,7 +702,7 @@ function excelSerialToTimeInfo(serialTime) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return {
-    str: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`,
+    str: `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
     seconds: totalSeconds
   };
 }
@@ -750,36 +777,21 @@ function recalculateAndRenderAll() {
     const isPreHoliday = isFriday || !!preHolidayReason;
 
     // Determine target start time
-    let targetSeconds = 28800; // 08:00:00 default
-    let targetStr = '08:00:00';
+    let targetSeconds = 28800; // 08:00
+    let targetStr = '08:00';
 
     if (AppState.mode === 'workshop') {
       if (isPreHoliday) {
-        targetSeconds = 25200; // 07:00:00
-        targetStr = '07:00:00';
+        targetSeconds = 25200; // 07:00
+        targetStr = '07:00';
       } else {
-        targetSeconds = 28800; // 08:00:00
-        targetStr = '08:00:00';
+        targetSeconds = 28800; // 08:00
+        targetStr = '08:00';
       }
     } else {
-      // Mode 'dws'
-      const parsedDWS = parseTargetSecondsFromDWS(dwsText);
-      if (isPreHoliday && (parsedDWS === null || parsedDWS === 28800 || parsedDWS === 25200)) {
-        // Enforce 07:00 target on Friday and Pre-Holidays if DWS is standard morning shift or unset
-        targetSeconds = 25200;
-        targetStr = '07:00:00';
-      } else if (parsedDWS !== null) {
-        targetSeconds = parsedDWS;
-        const hh = Math.floor(targetSeconds / 3600);
-        const mm = Math.floor((targetSeconds % 3600) / 60);
-        targetStr = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
-      } else if (isPreHoliday) {
-        targetSeconds = 25200;
-        targetStr = '07:00:00';
-      } else {
-        targetSeconds = 28800;
-        targetStr = '08:00:00';
-      }
+      // Mode 'dws' (Office Mode)
+      targetSeconds = 32400; // 09:00
+      targetStr = '09:00';
     }
 
     if (isPreHoliday && clockInInfo.seconds > 0) {
@@ -806,8 +818,14 @@ function recalculateAndRenderAll() {
       } else {
         isLate = false;
         lateMinutes = 0;
-        allowance = 25; // ได้ค่าข้าว 25 บาท!
-        statusText = AppState.lang === 'en' ? '✅ On Time (+25฿)' : '✅ ตรงเวลา (+25฿)';
+        
+        if (AppState.mode === 'dws' && actualHours < 8) {
+          allowance = 0; // อดค่าข้าว 25 บาท! (ทำงานไม่ครบ 8 ชม.)
+          statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ)';
+        } else {
+          allowance = 25; // ได้ค่าข้าว 25 บาท!
+          statusText = AppState.lang === 'en' ? '✅ On Time (+25฿)' : '✅ ตรงเวลา (+25฿)';
+        }
         totalOntimeDays++;
       }
     }
@@ -1036,7 +1054,7 @@ function renderDailyTable() {
   renderPaginationControls(totalPages);
 
   if (pageRecords.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="12" class="text-center py-4">🔍 ${AppState.lang === 'en' ? 'No attendance records match the filters' : 'ไม่พบรายการเข้า-ออกงานที่ตรงกับเงื่อนไข'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" class="text-center py-4">🔍 ${AppState.lang === 'en' ? 'No attendance records match the filters' : 'ไม่พบรายการเข้า-ออกงานที่ตรงกับเงื่อนไข'}</td></tr>`;
     return;
   }
 
