@@ -157,6 +157,7 @@ function setupEventListeners() {
   // Daily Filters
   document.getElementById('daily-search-input').addEventListener('input', () => { AppState.dailyPage = 1; renderDailyTable(); });
   document.getElementById('daily-month-filter').addEventListener('change', () => { AppState.dailyPage = 1; renderDailyTable(); });
+  document.getElementById('daily-dept-filter').addEventListener('change', () => { AppState.dailyPage = 1; renderDailyTable(); });
   document.getElementById('daily-status-filter').addEventListener('change', () => { AppState.dailyPage = 1; renderDailyTable(); });
 
   // Holiday Form
@@ -873,10 +874,20 @@ function recalculateAndRenderAll() {
 
   // Populate Department filter options
   const deptSelect = document.getElementById('summary-dept-filter');
+  const dailyDeptSelect = document.getElementById('daily-dept-filter');
   const currentDeptVal = deptSelect.value;
+  const currentDailyDeptVal = dailyDeptSelect ? dailyDeptSelect.value : 'all';
+  
   deptSelect.innerHTML = `<option value="all">🏢 ทุกแผนก (All Departments)</option>`;
+  if (dailyDeptSelect) {
+    dailyDeptSelect.innerHTML = `<option value="all">🏢 ทุกแผนก (All Departments)</option>`;
+  }
+  
   [...deptsSet].sort().forEach(d => {
     deptSelect.innerHTML += `<option value="${d}" ${d === currentDeptVal ? 'selected' : ''}>${d}</option>`;
+    if (dailyDeptSelect) {
+      dailyDeptSelect.innerHTML += `<option value="${d}" ${d === currentDailyDeptVal ? 'selected' : ''}>${d}</option>`;
+    }
   });
 
   // Update KPI Cards
@@ -976,6 +987,7 @@ function renderDailyTable() {
   const tbody = document.getElementById('daily-tbody');
   const search = document.getElementById('daily-search-input').value.trim().toLowerCase();
   const monthFilter = document.getElementById('daily-month-filter').value;
+  const deptFilter = document.getElementById('daily-dept-filter') ? document.getElementById('daily-dept-filter').value : 'all';
   const statusFilter = document.getElementById('daily-status-filter').value;
 
   let records = AppState.processedRecords;
@@ -984,6 +996,10 @@ function renderDailyTable() {
   if (monthFilter !== 'all') {
     const targetMonthStr = `-${String(monthFilter).padStart(2, '0')}-`;
     records = records.filter(r => r.dateStr.includes(targetMonthStr));
+  }
+  
+  if (deptFilter !== 'all') {
+    records = records.filter(r => r.dept === deptFilter);
   }
 
   if (statusFilter === 'ontime') {
@@ -1039,6 +1055,7 @@ function renderDailyTable() {
         <td><span class="badge ${r.isFriday ? 'badge-accent' : 'badge-secondary'}">${r.dayNameShort}</span></td>
         <td>${r.empId}</td>
         <td>${r.empName}</td>
+        <td><span class="badge badge-secondary">${r.dept}</span></td>
         <td>
           <span title="${r.dwsText}">${r.dwsText}</span>
           ${r.isPreHoliday ? `<span class="badge badge-accent mt-1" title="${r.preHolidayReason}">🌟 Pre-Holiday 07:00</span>` : ''}
