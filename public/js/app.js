@@ -840,6 +840,9 @@ function recalculateAndRenderAll() {
         } else if (leaveReason) {
           allowance = 0; // อดค่าข้าว (มีการลา)
           statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. Leave)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว วันลา)';
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+          allowance = 0; // อดค่าข้าว (วันหยุดเสาร์-อาทิตย์)
+          statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว ส-อา)';
         } else {
           allowance = 25; // ได้ค่าข้าว 25 บาท!
           statusText = AppState.lang === 'en' ? '✅ On Time (+25฿)' : '✅ ตรงเวลา (+25฿)';
