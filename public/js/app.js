@@ -1301,6 +1301,14 @@ function openEmployeeModal(empId) {
   document.getElementById('m-stat-late').textContent = `${emp.lateDays} ${dayUnit}`;
   document.getElementById('m-stat-allowance').textContent = `${emp.totalAllowance.toLocaleString()} ฿`;
 
+  // Leave Stats
+  const leaveEl = document.getElementById('m-stat-leave');
+  if (Object.keys(emp.leaveStats).length > 0) {
+    leaveEl.innerHTML = Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap;">- ${reason}: ${count} วัน</div>`).join('');
+  } else {
+    leaveEl.textContent = '-';
+  }
+
   // Sort employee records by date descending
   const sortedRecords = [...emp.records].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
 
@@ -1326,7 +1334,10 @@ function openEmployeeModal(empId) {
         <td class="font-mono text-secondary">${r.targetTimeStr}</td>
         <td class="font-mono">${r.clockOutStr}</td>
         <td class="text-center">${r.actualHours.toFixed(1)} / ${r.totalOT > 0 ? '+' + r.totalOT.toFixed(1) : '-'}</td>
-        <td class="text-center"><span class="badge ${statusClass}">${r.statusText}</span></td>
+        <td class="text-center">
+          <span class="badge ${statusClass}">${r.statusText}</span>
+          ${r.leaveReason ? `<br><span class="badge badge-warning mt-1" style="font-size:0.75rem; white-space:normal;">🛌 ${r.leaveReason}</span>` : ''}
+        </td>
         <td class="text-right highlight-col">${allowanceText}</td>
       </tr>
     `;

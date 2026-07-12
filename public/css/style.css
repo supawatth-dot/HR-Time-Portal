@@ -1140,7 +1140,7 @@ body.theme-light .modal-box {
 
 .modal-stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1rem;
   background: rgba(255, 255, 255, 0.03);
   padding: 1rem;
