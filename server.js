@@ -60,6 +60,79 @@ app.post('/api/holidays', (req, res) => {
   }
 });
 
+// Helper: Load Master Shift Schedule from Data/shipt, Data/shift, and root
+function getMasterShifts() {
+  const shiftMap = {};
+  try {
+    const xlsx = require('xlsx');
+    const searchDirs = [
+      path.join(__dirname, 'Data', 'shipt'),
+      path.join(__dirname, 'Data', 'shift'),
+      path.join(__dirname, 'Data'),
+      __dirname
+    ];
+    searchDirs.forEach(dir => {
+      if (fs.existsSync(dir)) {
+        fs.readdirSync(dir).forEach(file => {
+          if (file.endsWith('.xlsx') && (file.toLowerCase().includes('shift') || file.toLowerCase().includes('shipt') || dir.toLowerCase().includes('data'))) {
+            const filePath = path.join(dir, file);
+            try {
+              const wb = xlsx.readFile(filePath);
+              wb.SheetNames.forEach(s => {
+                const rows = xlsx.utils.sheet_to_json(wb.Sheets[s], { header: 1 });
+                rows.forEach(r => {
+                  const dt = r[0];
+                  const id = r[1];
+                  const inTime = r[3];
+                  if (typeof dt === 'number' && id && id !== 'Emp.ID' && id !== 'Signature:' && id !== 'Name:') {
+                    const dateObj = new Date(Math.round((dt - 25569) * 86400 * 1000));
+                    const dateStr = dateObj.toISOString().slice(0, 10);
+                    const empId = String(id).trim();
+                    const sTime = String(inTime || '').trim();
+                    
+                    let targetSeconds = 54000;
+                    let targetStr = '15:00 (N1)';
+                    let isNightShift = true;
+
+                    if (sTime === '03.30' || sTime === '15.30' || sTime === '15:30' || sTime === '3.30' || sTime === '3:30') {
+                      targetSeconds = 55800; targetStr = '15:30 (N2)'; isNightShift = true;
+                    } else if (sTime === '04.30' || sTime === '16.30' || sTime === '16:30' || sTime === '4.30' || sTime === '4:30') {
+                      targetSeconds = 59400; targetStr = '16:30 (N)'; isNightShift = true;
+                    } else if (sTime === '04.00' || sTime === '16.00' || sTime === '16:00' || sTime === '4.00' || sTime === '4:00') {
+                      targetSeconds = 57600; targetStr = '16:00 (N3)'; isNightShift = true;
+                    } else if (sTime === '03.00' || sTime === '15.00' || sTime === '15:00' || sTime === '3.00' || sTime === '3:00') {
+                      targetSeconds = 54000; targetStr = '15:00 (N1)'; isNightShift = true;
+                    } else if (sTime === '05.30' || sTime === '17.30' || sTime === '17:30' || sTime === '5.30' || sTime === '5:30') {
+                      targetSeconds = 63000; targetStr = '17:30 (N4)'; isNightShift = true;
+                    } else if (sTime === '08.00' || sTime === '08:00' || sTime === '8.00' || sTime === '8:00') {
+                      targetSeconds = 28800; targetStr = '08:00'; isNightShift = false;
+                    } else if (sTime === '07.00' || sTime === '07:00' || sTime === '7.00' || sTime === '7:00') {
+                      targetSeconds = 25200; targetStr = '07:00'; isNightShift = false;
+                    }
+
+                    const masterData = { empId, date: dateStr, inTime: sTime, targetSeconds, targetStr, isNightShift, normInSecs: targetSeconds };
+                    shiftMap[empId + '_' + dateStr] = masterData;
+                    shiftMap[parseInt(empId, 10) + '_' + dateStr] = masterData;
+                  }
+                });
+              });
+            } catch (err) {}
+          }
+        });
+      }
+    });
+  } catch (err) {
+    console.error('Error reading shift master data:', err);
+  }
+  return shiftMap;
+}
+
+// API: Get Master Shift Schedule from Data/shipt
+app.get('/api/shift-master', (req, res) => {
+  const shiftMap = getMasterShifts();
+  res.json({ success: true, count: Object.keys(shiftMap).length, shiftMap });
+});
+
 // Helper to parse Excel file into raw JSON rows
 function parseExcelFile(filePath) {
   // We use SheetJS if installed, or dynamic require

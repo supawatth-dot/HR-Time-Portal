@@ -10,6 +10,7 @@ const AppState = {
   employeeSummary: {},
   holidays: [],
   preHolidaysMap: {}, // 'YYYY-MM-DD': 'Pre-holiday reason'
+  shiftMasterMap: {}, // 'EmpID_YYYY-MM-DD': master shift schedule from Data/shipt
   mode: 'workshop',   // 'workshop' | 'dws'
   lateToleranceSec: 60, // 60 seconds = 1 minute
   currentTab: 'tab-summary',
@@ -33,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   applyLanguage();
   await loadHolidays();
+  await loadShiftMasterMap();
   await loadDefaultExcel();
 });
 
@@ -457,6 +459,23 @@ async function loadHolidays() {
 }
 
 /**
+ * Load Master Shift Schedule from API (/api/shift-master)
+ */
+async function loadShiftMasterMap() {
+  try {
+    const response = await fetch('/api/shift-master');
+    if (!response.ok) throw new Error('Shift Master API server not responding');
+    const result = await response.json();
+    if (result.success && result.shiftMap) {
+      AppState.shiftMasterMap = result.shiftMap;
+      console.log('🎯 Loaded Master Shift Schedules:', Object.keys(AppState.shiftMasterMap).length, 'records');
+    }
+  } catch (err) {
+    console.warn('Could not load shift master data from API /api/shift-master:', err);
+  }
+}
+
+/**
  * Save Holidays to Server API
  */
 async function saveHolidaysToServer() {
@@ -758,8 +777,28 @@ function parseTargetSecondsFromDWS(dwsText) {
  * 3. 16:00 - 03:30 (หรือ 04.00 - 03.30) -> Target: 16:00 (57600s)
  * 4. 17:30 - 03:30 (หรือ 05.30 - 03.30) -> Target: 17:30 (63000s)
  */
-function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHoliday, mode) {
+function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHoliday, mode, empId, dateStr) {
   const dws = String(dwsText || '').trim().toLowerCase();
+  
+  // 0. Check Master Shift Map (from Data/shipt / Data/shift) for exact assigned schedule
+  if (empId && dateStr && AppState && AppState.shiftMasterMap) {
+    const key1 = `${empId}_${dateStr}`;
+    const key2 = `${parseInt(empId, 10)}_${dateStr}`;
+    const masterInfo = AppState.shiftMasterMap[key1] || AppState.shiftMasterMap[key2];
+    if (masterInfo) {
+      let normInSecs = clockInSeconds;
+      if (masterInfo.isNightShift && clockInSeconds >= 7200 && clockInSeconds <= 21600 && clockOutSeconds > 0 && clockOutSeconds <= 21600) {
+        normInSecs += 43200;
+      }
+      return {
+        targetSeconds: masterInfo.targetSeconds,
+        targetStr: masterInfo.targetStr,
+        isNightShift: masterInfo.isNightShift,
+        normInSecs: normInSecs,
+        isMasterOverride: true
+      };
+    }
+  }
   
   // Normalize 12-hour afternoon clock-in if recorded as e.g. 03:30 (12600s) or 04:00 (14400s) when exit is after midnight (00:00 - 06:00)
   let normInSecs = clockInSeconds;
@@ -982,7 +1021,8 @@ function recalculateAndRenderAll() {
       clockInStr: clockInInfo.str,
       clockInSeconds: clockInInfo.seconds,
       clockOutStr: clockOutInfo.str,
-      targetTimeStr: targetStr,
+      targetTimeStr: shiftInfo.isMasterOverride ? (AppState.lang === 'en' ? `${targetStr} (Master)` : `${targetStr} (ตารางกะ)`) : targetStr,
+      isMasterOverride: shiftInfo.isMasterOverride || false,
       targetSeconds,
       actualHours,
       totalOT,
