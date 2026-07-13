@@ -188,6 +188,28 @@
     <!-- Main Navigation Tabs -->
     <section class="workspace-section">
       <div class="tabs-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.8rem; padding-bottom: 0.3rem;">
+          <h3 style="margin: 0; font-size: 1.05rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem; font-weight: 700;">
+            <span>📑 เลือกมุมมองข้อมูลและการเบิกจ่าย (Workspace Views)</span>
+          </h3>
+          <div class="tabs-toolbar">
+            <button class="btn btn-secondary btn-sm" id="btn-print-summary" title="พิมพ์สรุปใบเบิกค่าข้าวหรือบันทึกเป็น PDF">
+              🖨️ พิมพ์ใบสรุป / PDF
+            </button>
+            <div class="dropdown">
+              <button class="btn btn-primary btn-sm dropdown-toggle" id="btn-export-dropdown">
+                📥 Export ข้อมูล (Excel/CSV)
+              </button>
+              <div class="dropdown-menu" id="export-menu">
+                <a href="#" class="dropdown-item" id="export-summary-xlsx">📊 Export สรุปค่าข้าวรายบุคคล (.xlsx)</a>
+                <a href="#" class="dropdown-item" id="export-daily-xlsx">📋 Export รายการเข้า-ออกรายวัน (.xlsx)</a>
+                <a href="#" class="dropdown-item" id="export-dispute-xlsx">⚡ Export รายการขอคืนสิทธิ์/ผิดปกติ (.xlsx)</a>
+                <a href="#" class="dropdown-item" id="export-summary-csv">📄 Export สรุปรายบุคคล (.csv)</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="tab-list">
           <button class="tab-btn active" data-tab="tab-summary">
             <span class="tab-icon">📋</span>
@@ -213,23 +235,6 @@
             <span>5. จัดการรายการผิดปกติ & คืนสิทธิ์ (+25฿)</span>
             <span class="tab-badge badge-danger" id="tab-dispute-count">0</span>
           </button>
-        </div>
-        
-        <div class="tabs-toolbar">
-          <button class="btn btn-secondary btn-sm" id="btn-print-summary" title="พิมพ์สรุปใบเบิกค่าข้าวหรือบันทึกเป็น PDF">
-            🖨️ พิมพ์ใบสรุป / PDF
-          </button>
-          <div class="dropdown">
-            <button class="btn btn-primary btn-sm dropdown-toggle" id="btn-export-dropdown">
-              📥 Export ข้อมูล (Excel/CSV)
-            </button>
-            <div class="dropdown-menu" id="export-menu">
-              <a href="#" class="dropdown-item" id="export-summary-xlsx">📊 Export สรุปค่าข้าวรายบุคคล (.xlsx)</a>
-              <a href="#" class="dropdown-item" id="export-daily-xlsx">📋 Export รายการเข้า-ออกรายวัน (.xlsx)</a>
-              <a href="#" class="dropdown-item" id="export-dispute-xlsx">⚡ Export รายการขอคืนสิทธิ์/ผิดปกติ (.xlsx)</a>
-              <a href="#" class="dropdown-item" id="export-summary-csv">📄 Export สรุปรายบุคคล (.csv)</a>
-            </div>
-          </div>
         </div>
       </div>
 
