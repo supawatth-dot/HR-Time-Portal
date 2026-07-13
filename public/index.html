@@ -99,7 +99,13 @@
           
           <!-- Mode Selection -->
           <div class="rule-group">
-            <label class="rule-label">👉 เลือกโหมดการคำนวณเวลาเข้างาน:</label>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+              <label class="rule-label" style="margin-bottom: 0;">👉 เลือกโหมดการคำนวณเวลาเข้างาน (โหมดหลักระบบ):</label>
+              <button id="btn-open-custom-rules" class="btn btn-sm btn-primary" style="display: flex; align-items: center; gap: 6px; font-weight: 600; padding: 6px 12px; border-radius: 6px;">
+                <span>🎯 ตั้งค่าเกณฑ์แยกรายแผนก/บุคคล</span>
+                <span id="custom-rule-count-badge" class="badge badge-warning" style="display: none; font-size: 0.75rem; padding: 2px 6px; border-radius: 10px; background: #f59e0b; color: #fff;">0</span>
+              </button>
+            </div>
             <div class="mode-toggle-group">
               <button class="mode-btn active" data-mode="workshop">
                 <span class="mode-title">⭐ โหมด Workshop มาตรฐาน</span>
@@ -652,6 +658,88 @@
       <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.8rem;">
         <button class="btn btn-secondary btn-sm" onclick="closeManualTimeModal()">ยกเลิก</button>
         <button class="btn btn-success btn-sm" onclick="saveManualTimeOverride()" style="font-weight: bold;">💾 บันทึกและคืนสิทธิ์ +25฿</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Dept/Emp Rules Modal -->
+  <div class="modal-backdrop hidden" id="modal-custom-rules" style="z-index: 1050;">
+    <div class="modal-box" style="max-width: 780px; width: 95%;">
+      <div class="modal-header">
+        <h3 id="modal-custom-title">🎯 ตั้งค่าเกณฑ์คำนวณเวลาเข้างาน (แยกรายแผนก & รายบุคคล)</h3>
+        <button class="btn-close" id="btn-close-custom-rules">✕</button>
+      </div>
+      
+      <div class="modal-body" style="padding: 18px; max-height: 75vh; overflow-y: auto;">
+        <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 16px;">
+          💡 คุณสามารถกำหนดให้แต่ละแผนก หรือพนักงานแต่ละคน ใช้เกณฑ์คำนวณที่แตกต่างจากโหมดหลักด้านนอกได้อย่างอิสระและยืดหยุ่นที่สุด
+        </p>
+
+        <!-- Tabs -->
+        <div class="tabs-nav" style="margin-bottom: 16px; display: flex; gap: 8px; border-bottom: 2px solid var(--border-color); padding-bottom: 8px;">
+          <button class="tab-btn active" id="tab-btn-dept-rules" style="flex: 1; padding: 10px; font-weight: 600; border-radius: 6px; cursor: pointer; background: var(--primary-color); color: #fff; border: none;">
+            🏢 กำหนดเกณฑ์ตามแผนก (Department Mode)
+          </button>
+          <button class="tab-btn" id="tab-btn-emp-rules" style="flex: 1; padding: 10px; font-weight: 600; border-radius: 6px; cursor: pointer; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-color);">
+            👤 กำหนดเกณฑ์รายบุคคล (Employee Override)
+          </button>
+        </div>
+
+        <!-- Dept Rules Tab Content -->
+        <div id="tab-content-dept-rules" class="tab-content">
+          <div class="table-container" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+            <table class="table" style="width: 100%; margin-bottom: 0;">
+              <thead style="position: sticky; top: 0; background: var(--bg-card); z-index: 2;">
+                <tr>
+                  <th>ชื่อแผนก (Department)</th>
+                  <th style="text-align: center;">จำนวนเรคคอร์ด</th>
+                  <th style="width: 290px;">เกณฑ์ที่เลือกใช้ (Criteria Mode)</th>
+                </tr>
+              </thead>
+              <tbody id="table-dept-rules-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Emp Rules Tab Content -->
+        <div id="tab-content-emp-rules" class="tab-content hidden" style="display: none;">
+          <div style="display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; background: var(--bg-card); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <input type="text" id="input-emp-rule-id" class="form-control" placeholder="ระบุรหัสพนักงาน หรือชื่อ (เช่น 21119)..." style="flex: 2; min-width: 200px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+            <select id="select-emp-rule-mode" class="form-control" style="flex: 1; min-width: 170px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+              <option value="workshop">⭐ โหมด Workshop (08:00/07:00 น.)</option>
+              <option value="dws">📋 โหมด Office (ไม่เกิน 09:00 น.)</option>
+              <option value="night">🌙 โหมดกะบ่าย/กะดึก (Auto Shift)</option>
+            </select>
+            <button id="btn-add-emp-rule" class="btn btn-primary btn-sm" style="font-weight: 600; padding: 6px 14px; border-radius: 6px;">+ เพิ่มเกณฑ์บุคคล</button>
+          </div>
+
+          <div class="table-container" style="max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+            <table class="table" style="width: 100%; margin-bottom: 0;">
+              <thead style="position: sticky; top: 0; background: var(--bg-card); z-index: 2;">
+                <tr>
+                  <th>รหัสพนักงาน</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>แผนก</th>
+                  <th>เกณฑ์ที่กำหนดไว้</th>
+                  <th style="text-align: center; width: 90px;">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="table-emp-rules-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px;">
+        <button id="btn-reset-all-rules" class="btn btn-secondary btn-sm" style="color: var(--danger-color); font-weight: 600;">
+          🗑️ ล้างเกณฑ์พิเศษทั้งหมด (กลับไปใช้โหมดหลัก)
+        </button>
+        <button id="btn-close-custom-rules-bottom" class="btn btn-primary btn-sm" style="padding: 6px 16px; font-weight: bold;">บันทึก & คำนวณใหม่</button>
       </div>
     </div>
   </div>

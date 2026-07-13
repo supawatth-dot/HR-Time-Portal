@@ -11,6 +11,8 @@ const AppState = {
   holidays: [],
   preHolidaysMap: {}, // 'YYYY-MM-DD': 'Pre-holiday reason'
   shiftMasterMap: {}, // 'EmpID_YYYY-MM-DD': master shift schedule from Data/shipt
+  deptRuleMap: JSON.parse(localStorage.getItem('hr_time_dept_rules_v1') || '{}'), // { deptName: mode }
+  empRuleMap: JSON.parse(localStorage.getItem('hr_time_emp_rules_v1') || '{}'),   // { empId: mode }
   mode: 'workshop',   // 'workshop' | 'dws'
   lateToleranceSec: 60, // 60 seconds = 1 minute
   currentTab: 'tab-summary',
@@ -277,6 +279,9 @@ function setupEventListeners() {
       exportEmployeeModalXLSX(AppState.selectedEmployeeForModal);
     }
   });
+
+  setupCustomRulesEventListeners();
+  updateCustomRulesBadge();
 }
 
 /**
@@ -427,6 +432,237 @@ function applyLanguage() {
   if (AppState.processedRecords && AppState.processedRecords.length > 0) {
     recalculateAndRenderAll();
   }
+}
+
+/**
+ * Setup Custom Rules (Per-Department / Per-Employee) Event Listeners
+ */
+function setupCustomRulesEventListeners() {
+  const btnOpen = document.getElementById('btn-open-custom-rules');
+  const btnCloseTop = document.getElementById('btn-close-custom-rules');
+  const btnCloseBottom = document.getElementById('btn-close-custom-rules-bottom');
+  const modal = document.getElementById('modal-custom-rules');
+
+  if (btnOpen) {
+    btnOpen.addEventListener('click', openCustomRulesModal);
+  }
+  if (btnCloseTop && modal) {
+    btnCloseTop.addEventListener('click', () => modal.classList.add('hidden'));
+  }
+  if (btnCloseBottom && modal) {
+    btnCloseBottom.addEventListener('click', () => {
+      modal.classList.add('hidden');
+      recalculateAndRenderAll();
+    });
+  }
+
+  // Tabs
+  const tabDeptBtn = document.getElementById('tab-btn-dept-rules');
+  const tabEmpBtn = document.getElementById('tab-btn-emp-rules');
+  const contentDept = document.getElementById('tab-content-dept-rules');
+  const contentEmp = document.getElementById('tab-content-emp-rules');
+
+  if (tabDeptBtn && tabEmpBtn) {
+    tabDeptBtn.addEventListener('click', () => {
+      tabDeptBtn.style.background = 'var(--primary-color)';
+      tabDeptBtn.style.color = '#fff';
+      tabDeptBtn.style.border = 'none';
+      tabEmpBtn.style.background = 'var(--bg-card)';
+      tabEmpBtn.style.color = 'var(--text-main)';
+      tabEmpBtn.style.border = '1px solid var(--border-color)';
+      if (contentDept) { contentDept.classList.remove('hidden'); contentDept.style.display = 'block'; }
+      if (contentEmp) { contentEmp.classList.add('hidden'); contentEmp.style.display = 'none'; }
+    });
+    tabEmpBtn.addEventListener('click', () => {
+      tabEmpBtn.style.background = 'var(--primary-color)';
+      tabEmpBtn.style.color = '#fff';
+      tabEmpBtn.style.border = 'none';
+      tabDeptBtn.style.background = 'var(--bg-card)';
+      tabDeptBtn.style.color = 'var(--text-main)';
+      tabDeptBtn.style.border = '1px solid var(--border-color)';
+      if (contentEmp) { contentEmp.classList.remove('hidden'); contentEmp.style.display = 'block'; }
+      if (contentDept) { contentDept.classList.add('hidden'); contentDept.style.display = 'none'; }
+    });
+  }
+
+  // Add Employee Override Button
+  const btnAddEmp = document.getElementById('btn-add-emp-rule');
+  if (btnAddEmp) {
+    btnAddEmp.addEventListener('click', () => {
+      const input = document.getElementById('input-emp-rule-id');
+      const select = document.getElementById('select-emp-rule-mode');
+      if (!input || !select) return;
+      const empIdOrName = input.value.trim();
+      if (!empIdOrName) {
+        alert(AppState.lang === 'en' ? 'Please enter Employee ID or Name' : 'กรุณาระบุรหัสพนักงาน หรือชื่อพนักงาน');
+        return;
+      }
+      
+      let matchedId = empIdOrName;
+      if (!AppState.employeeSummary[empIdOrName]) {
+        for (const [id, summary] of Object.entries(AppState.employeeSummary)) {
+          if (id === empIdOrName || summary.name.toLowerCase().includes(empIdOrName.toLowerCase())) {
+            matchedId = id;
+            break;
+          }
+        }
+      }
+
+      AppState.empRuleMap[matchedId] = select.value;
+      localStorage.setItem('hr_time_emp_rules_v1', JSON.stringify(AppState.empRuleMap));
+      input.value = '';
+      renderEmpRulesTable();
+      updateCustomRulesBadge();
+      recalculateAndRenderAll();
+    });
+  }
+
+  // Reset All Rules Button
+  const btnResetAll = document.getElementById('btn-reset-all-rules');
+  if (btnResetAll) {
+    btnResetAll.addEventListener('click', () => {
+      if (confirm(AppState.lang === 'en' ? 'Reset all custom department and employee rules to global default?' : 'ต้องการล้างเกณฑ์พิเศษที่ตั้งไว้ทั้งหมด (กลับไปใช้โหมดหลัก) ใช่หรือไม่?')) {
+        AppState.deptRuleMap = {};
+        AppState.empRuleMap = {};
+        localStorage.removeItem('hr_time_dept_rules_v1');
+        localStorage.removeItem('hr_time_emp_rules_v1');
+        renderDeptRulesTable();
+        renderEmpRulesTable();
+        updateCustomRulesBadge();
+        recalculateAndRenderAll();
+      }
+    });
+  }
+}
+
+/**
+ * Update Custom Rules Active Count Badge
+ */
+function updateCustomRulesBadge() {
+  const badge = document.getElementById('custom-rule-count-badge');
+  if (!badge) return;
+  const deptCount = Object.keys(AppState.deptRuleMap || {}).length;
+  const empCount = Object.keys(AppState.empRuleMap || {}).length;
+  const total = deptCount + empCount;
+  if (total > 0) {
+    badge.textContent = `${total} รายการเฉพาะ`;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+/**
+ * Open Custom Rules Configuration Modal
+ */
+function openCustomRulesModal() {
+  const modal = document.getElementById('modal-custom-rules');
+  if (!modal) return;
+  renderDeptRulesTable();
+  renderEmpRulesTable();
+  modal.classList.remove('hidden');
+}
+
+/**
+ * Render Department Rules Table
+ */
+function renderDeptRulesTable() {
+  const tbody = document.getElementById('table-dept-rules-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const depts = {};
+  AppState.rawRecords.forEach(r => {
+    if (!r[0]) return;
+    const d = String(r[21] || r[20] || 'Workshop').trim() || 'Workshop';
+    depts[d] = (depts[d] || 0) + 1;
+  });
+
+  const sortedDepts = Object.keys(depts).sort();
+  if (sortedDepts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-secondary py-4">ยังไม่พบข้อมูลแผนกจากไฟล์ Excel</td></tr>`;
+    return;
+  }
+
+  sortedDepts.forEach(dept => {
+    const tr = document.createElement('tr');
+    const currentMode = AppState.deptRuleMap[dept] || '';
+    tr.innerHTML = `
+      <td class="font-bold">${dept}</td>
+      <td style="text-align: center;"><span class="badge badge-info">${depts[dept]} แถว</span></td>
+      <td>
+        <select class="form-control select-dept-mode" data-dept="${dept}" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <option value="" ${!currentMode ? 'selected' : ''}>🌐 ตามโหมดหลักระบบ (${AppState.mode.toUpperCase()})</option>
+          <option value="workshop" ${currentMode === 'workshop' ? 'selected' : ''}>⭐ โหมด Workshop (08:00/07:00 น.)</option>
+          <option value="dws" ${currentMode === 'dws' ? 'selected' : ''}>📋 โหมด Office (ไม่เกิน 09:00 น.)</option>
+          <option value="night" ${currentMode === 'night' ? 'selected' : ''}>🌙 โหมดกะบ่าย/กะดึก (Auto Shift)</option>
+        </select>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.select-dept-mode').forEach(sel => {
+    sel.addEventListener('change', (e) => {
+      const deptName = e.target.getAttribute('data-dept');
+      const val = e.target.value;
+      if (!val) {
+        delete AppState.deptRuleMap[deptName];
+      } else {
+        AppState.deptRuleMap[deptName] = val;
+      }
+      localStorage.setItem('hr_time_dept_rules_v1', JSON.stringify(AppState.deptRuleMap));
+      updateCustomRulesBadge();
+      recalculateAndRenderAll();
+    });
+  });
+}
+
+/**
+ * Render Employee Rules Table
+ */
+function renderEmpRulesTable() {
+  const tbody = document.getElementById('table-emp-rules-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const empIds = Object.keys(AppState.empRuleMap || {}).sort();
+  if (empIds.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-secondary py-4">ยังไม่มีการกำหนดเกณฑ์เฉพาะรายบุคคล (ใช้เกณฑ์ตามแผนกหรือโหมดหลัก)</td></tr>`;
+    return;
+  }
+
+  empIds.forEach(empId => {
+    const mode = AppState.empRuleMap[empId];
+    const summary = AppState.employeeSummary[empId] || { name: 'ไม่ทราบชื่อ', dept: '-' };
+    let modeLabel = mode;
+    if (mode === 'workshop') modeLabel = '⭐ โหมด Workshop (08:00/07:00 น.)';
+    else if (mode === 'dws') modeLabel = '📋 โหมด Office (ไม่เกิน 09:00 น.)';
+    else if (mode === 'night') modeLabel = '🌙 โหมดกะบ่าย/กะดึก (Auto Shift)';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="font-mono font-bold">${empId}</td>
+      <td>${summary.name}</td>
+      <td><span class="badge badge-secondary">${summary.dept}</span></td>
+      <td><span class="badge badge-primary">${modeLabel}</span></td>
+      <td style="text-align: center;">
+        <button class="btn btn-xs btn-outline btn-remove-emp-rule" data-emp="${empId}" style="color: var(--danger-color); border-color: var(--danger-color);">ลบ</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.btn-remove-emp-rule').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const emp = e.target.getAttribute('data-emp');
+      delete AppState.empRuleMap[emp];
+      localStorage.setItem('hr_time_emp_rules_v1', JSON.stringify(AppState.empRuleMap));
+      renderEmpRulesTable();
+      updateCustomRulesBadge();
+      recalculateAndRenderAll();
+    });
+  });
 }
 
 /**
@@ -822,18 +1058,18 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
 
   // 2. If mode === 'night' OR if clock-in is in afternoon/evening window (14:00 - 21:00)
   if (mode === 'night' || (normInSecs >= 50400 && normInSecs <= 75600)) {
-    if (normInSecs <= 54900) { // <= 15:15 -> Shift N1 (15:00)
+    if (normInSecs <= 54900) {
       return { targetSeconds: 54000, targetStr: '15:00 (N1)', isNightShift: true, normInSecs };
-    } else if (normInSecs <= 56700) { // 15:15 to 15:45 -> Shift N2 (15:30)
+    } else if (normInSecs <= 56700) {
       return { targetSeconds: 55800, targetStr: '15:30 (N2)', isNightShift: true, normInSecs };
-    } else if (normInSecs <= 60300) { // 15:45 to 16:45 -> Shift N3 (16:00)
+    } else if (normInSecs <= 60300) {
       return { targetSeconds: 57600, targetStr: '16:00 (N3)', isNightShift: true, normInSecs };
-    } else { // > 16:45 -> Shift N4 (17:30)
+    } else {
       return { targetSeconds: 63000, targetStr: '17:30 (N4)', isNightShift: true, normInSecs };
     }
   }
 
-  // 3. Check for standard 24h targets in DWS (e.g. 08:00, 09:00, 07:00)
+  // 3. Check for standard 24h targets in DWS
   const parseSecs = parseTargetSecondsFromDWS(dwsText);
   if (parseSecs !== null) {
     const hh = Math.floor(parseSecs / 3600);
@@ -843,20 +1079,15 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
 
   // 4. Default Day Shifts
   if (mode === 'workshop') {
-    if (isPreHoliday) {
-      return { targetSeconds: 25200, targetStr: '07:00', isNightShift: false, normInSecs };
-    } else {
-      return { targetSeconds: 28800, targetStr: '08:00', isNightShift: false, normInSecs };
-    }
+    if (isPreHoliday) return { targetSeconds: 25200, targetStr: '07:00', isNightShift: false, normInSecs };
+    else return { targetSeconds: 28800, targetStr: '08:00', isNightShift: false, normInSecs };
   } else {
-    // Mode 'dws'
     return { targetSeconds: 32400, targetStr: '09:00', isNightShift: false, normInSecs };
   }
 }
 
 /**
  * Core Calculation Engine
- * Processes all rows according to HR rules (Mon-Thu 08:00, Fri/Pre-Holiday 07:00 or DWS mode)
  */
 function recalculateAndRenderAll() {
   buildPreHolidaysMap();
@@ -871,9 +1102,7 @@ function recalculateAndRenderAll() {
   let minDate = '9999-99-99';
   let maxDate = '0000-00-00';
 
-  // Process rows
-  AppState.rawRecords.forEach((row, idx) => {
-    // Row layout: [0:ID, 1:Name, 2:Date, 3:DWS, 4:DWS Text, 5:ClockIn, 6:ClockOut, 7:EffHrs, 8:ActHrs, 9:OT1, 10:OT1.5, 11:OT2, 12:OT3, 13:Late, ... 21:Dept]
+  AppState.rawRecords.forEach((row) => {
     const empId = String(row[0] || '').trim();
     const empName = String(row[1] || 'Unknown Employee').trim();
     if (!empId || empId === '0' || !empName) return;
@@ -891,18 +1120,13 @@ function recalculateAndRenderAll() {
     const clockOutInfo = excelSerialToTimeInfo(row[6]);
     let actualHours = parseFloat(row[8]) || parseFloat(row[7]) || 0;
     
-    // Recalculate actual hours manually (ignoring Excel's pre-calculated early cutoff)
     if (clockInInfo.seconds > 0 && clockOutInfo.seconds > 0) {
       let diffSecs = clockOutInfo.seconds - clockInInfo.seconds;
-      if (diffSecs < 0) diffSecs += 86400; // Crossed midnight
-      
+      if (diffSecs < 0) diffSecs += 86400;
       let calcHours = diffSecs / 3600;
-      if (calcHours > 5) {
-        calcHours -= 1; // Deduct 1 hour lunch break
-      }
+      if (calcHours > 5) calcHours -= 1;
       actualHours = calcHours;
     }
-    // Sum OT hours
     const ot1 = parseFloat(row[9]) || 0;
     const ot15 = parseFloat(row[10]) || 0;
     const ot2 = parseFloat(row[11]) || 0;
@@ -912,21 +1136,17 @@ function recalculateAndRenderAll() {
     const dept = String(row[21] || row[20] || 'Workshop').trim() || 'Workshop';
     deptsSet.add(dept);
 
-    // Day of week check using safe noon construction
-    const dayOfWeek = getDayOfWeekSafe(dateStr); // 0 = Sun, 1 = Mon, ... 5 = Fri, 6 = Sat
-
-    // Check if Friday or Pre-holiday
+    const dayOfWeek = getDayOfWeekSafe(dateStr);
     const isFriday = (dayOfWeek === 5);
     const preHolidayReason = AppState.preHolidaysMap[dateStr];
     const isPreHoliday = isFriday || !!preHolidayReason;
 
-    // Determine target start time & detect night shift / afternoon shift
-    const shiftInfo = detectShiftTarget(dwsText, clockInInfo.seconds, clockOutInfo.seconds, isPreHoliday, AppState.mode);
+    const effectiveMode = (AppState.empRuleMap && AppState.empRuleMap[empId]) || (AppState.deptRuleMap && AppState.deptRuleMap[dept]) || AppState.mode;
+    const shiftInfo = detectShiftTarget(dwsText, clockInInfo.seconds, clockOutInfo.seconds, isPreHoliday, effectiveMode, empId, dateStr);
     const targetSeconds = shiftInfo.targetSeconds;
     const targetStr = shiftInfo.targetStr;
     const isNightShift = shiftInfo.isNightShift;
 
-    // Normalize 12-hour clock-in notation (e.g. 03:30 -> 15:30) if applicable
     if (shiftInfo.normInSecs && shiftInfo.normInSecs !== clockInInfo.seconds && clockInInfo.seconds > 0) {
       clockInInfo.seconds = shiftInfo.normInSecs;
       const hh = Math.floor(clockInInfo.seconds / 3600);
@@ -934,13 +1154,8 @@ function recalculateAndRenderAll() {
       clockInInfo.str = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     }
 
-    if (isPreHoliday && clockInInfo.seconds > 0) {
-      totalPreHolidayShifts++;
-    }
+    if (isPreHoliday && clockInInfo.seconds > 0) totalPreHolidayShifts++;
 
-    // Evaluate Late status & Food Allowance
-    // Rule: If Clock-In > Target + tolerance, then Late = true & Allowance = 0!
-    // Note: If Clock-In == 0 and Actual Hours == 0 (e.g. OD day off), no allowance, not late
     let isLate = false;
     let lateMinutes = 0;
     let allowance = 0;
@@ -949,38 +1164,30 @@ function recalculateAndRenderAll() {
       statusText = AppState.lang === 'en' ? 'Leave / Absence' : 'ลาหยุด';
     }
 
-    // Detect Anomaly Types (Missing In, Missing Out, Zero Stamp on Workday, Emergency Late)
     let anomalyType = null;
-    if (clockInInfo.seconds === 0 && clockOutInfo.seconds > 0) {
-      anomalyType = 'MISSING_IN';
-    } else if (clockInInfo.seconds > 0 && clockOutInfo.seconds === 0) {
-      anomalyType = 'MISSING_OUT';
-    } else if (clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && !leaveReason && dayOfWeek !== 0 && dayOfWeek !== 6) {
-      anomalyType = 'ZERO_STAMP';
-    }
+    if (clockInInfo.seconds === 0 && clockOutInfo.seconds > 0) anomalyType = 'MISSING_IN';
+    else if (clockInInfo.seconds > 0 && clockOutInfo.seconds === 0) anomalyType = 'MISSING_OUT';
+    else if (clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && !leaveReason && dayOfWeek !== 0 && dayOfWeek !== 6) anomalyType = 'ZERO_STAMP';
 
     const isAprilWorkshop = dateStr.startsWith('2026-04') && dept.toLowerCase().includes('workshop');
 
     if (clockInInfo.seconds > 0 || actualHours > 0) {
       const allowedCeiling = targetSeconds + AppState.lateToleranceSec;
-      
-      // HR Business Rule Verification: เดือนเมษา ในส่วนของ workshop ไม่มีคนมาทำงานสายหรือออกก่อนเวลา
       if (!isAprilWorkshop && clockInInfo.seconds > allowedCeiling) {
         isLate = true;
         lateMinutes = Math.ceil((clockInInfo.seconds - targetSeconds) / 60);
-        allowance = 0; // อดค่าข้าว 25 บาท!
+        allowance = 0;
         statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m` : `❌ สาย ${lateMinutes} นาที`;
         totalLateDays++;
         if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
       } else {
         isLate = false;
         lateMinutes = 0;
-        
-        if (!isAprilWorkshop && (AppState.mode === 'dws' || AppState.mode === 'night') && actualHours < 8 && actualHours > 0) {
-          allowance = 0; // อดค่าข้าว 25 บาท! (ทำงานไม่ครบ 8 ชม.)
+        if (!isAprilWorkshop && (effectiveMode === 'dws' || effectiveMode === 'night') && actualHours < 8 && actualHours > 0) {
+          allowance = 0;
           statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ 8 ชม.)';
         } else if (leaveReason) {
-          allowance = 0; // อดค่าข้าว (มีการลา)
+          allowance = 0;
           statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. Leave)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว วันลา)';
         } else if (dayOfWeek === 0 || dayOfWeek === 6) {
           allowance = 0; // อดค่าข้าว (วันหยุดเสาร์-อาทิตย์)
@@ -1024,7 +1231,10 @@ function recalculateAndRenderAll() {
       clockInStr: clockInInfo.str,
       clockInSeconds: clockInInfo.seconds,
       clockOutStr: clockOutInfo.str,
-      targetTimeStr: shiftInfo.isMasterOverride ? (AppState.lang === 'en' ? `${targetStr} (Master)` : `${targetStr} (ตารางกะ)`) : targetStr,
+      targetTimeStr: shiftInfo.isMasterOverride 
+        ? (AppState.lang === 'en' ? `${targetStr} (Master)` : `${targetStr} (ตารางกะ)`) 
+        : ((AppState.empRuleMap && AppState.empRuleMap[empId]) || (AppState.deptRuleMap && AppState.deptRuleMap[dept]) ? `${targetStr} [${effectiveMode.toUpperCase()}]` : targetStr),
+      effectiveMode,
       isMasterOverride: shiftInfo.isMasterOverride || false,
       targetSeconds,
       actualHours,
