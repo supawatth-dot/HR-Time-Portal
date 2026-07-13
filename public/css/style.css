@@ -3,21 +3,21 @@
    ========================================================================== */
 
 :root {
-  /* Dark Theme Variables (Default Premium) */
-  --bg-main: #0c0f17;
-  --bg-card: rgba(20, 25, 38, 0.75);
-  --bg-card-hover: rgba(28, 35, 53, 0.85);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(99, 102, 241, 0.5);
+  /* Dark Theme with Lime Green CI Accents */
+  --bg-main: #0c1017;
+  --bg-card: rgba(20, 26, 38, 0.85);
+  --bg-card-hover: rgba(28, 36, 53, 0.95);
+  --border-color: rgba(128, 183, 34, 0.18);
+  --border-focus: rgba(128, 183, 34, 0.6);
   
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
   
-  --primary: #6366f1;
-  --primary-hover: #4f46e5;
-  --accent: #f59e0b;
-  --accent-glow: rgba(245, 158, 11, 0.25);
+  --primary: #80B722;
+  --primary-hover: #6ea01c;
+  --accent: #80B722;
+  --accent-glow: rgba(128, 183, 34, 0.35);
   
   --success: #10b981;
   --success-bg: rgba(16, 185, 129, 0.12);
@@ -41,19 +41,25 @@
 }
 
 body.theme-light {
-  --bg-main: #f1f5f9;
-  --bg-card: rgba(255, 255, 255, 0.88);
-  --bg-card-hover: rgba(255, 255, 255, 0.98);
-  --border-color: rgba(0, 0, 0, 0.08);
-  --border-focus: rgba(99, 102, 241, 0.5);
+  /* White & Lime Green Company CI (Corporate Identity Master Theme) */
+  --bg-main: #fcfdfe;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f3f9eb;
+  --border-color: rgba(128, 183, 34, 0.28);
+  --border-focus: rgba(128, 183, 34, 0.7);
   
-  --text-primary: #0f172a;
+  --text-primary: #1e293b;
   --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-muted: #64748b;
   
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.12);
+  --primary: #80B722;
+  --primary-hover: #6ea01c;
+  --accent: #80B722;
+  --accent-glow: rgba(128, 183, 34, 0.25);
+  
+  --shadow-sm: 0 4px 10px -1px rgba(128, 183, 34, 0.08);
+  --shadow-md: 0 10px 20px -3px rgba(128, 183, 34, 0.14);
+  --shadow-lg: 0 20px 30px -5px rgba(128, 183, 34, 0.2);
 }
 
 * {
@@ -101,7 +107,7 @@ h1, h2, h3, h4, h5, h6 {
 .orb-1 {
   width: 500px;
   height: 500px;
-  background: #6366f1;
+  background: #80B722;
   top: -150px;
   left: -100px;
 }
@@ -109,7 +115,7 @@ h1, h2, h3, h4, h5, h6 {
 .orb-2 {
   width: 450px;
   height: 450px;
-  background: #3b82f6;
+  background: #96d12e;
   bottom: -100px;
   right: -100px;
   animation-delay: -5s;
@@ -136,14 +142,14 @@ h1, h2, h3, h4, h5, h6 {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(12, 15, 23, 0.85);
+  background: rgba(12, 16, 23, 0.85);
   backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-color);
   padding: 0.75rem 2rem;
 }
 
 body.theme-light .navbar {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .navbar-container {
@@ -163,25 +169,25 @@ body.theme-light .navbar {
 .brand-icon {
   width: 46px;
   height: 46px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  background: linear-gradient(135deg, var(--primary), #96d12e);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 15px rgba(128, 183, 34, 0.4);
 }
 
 .brand-text h1 {
   font-size: 1.35rem;
   letter-spacing: -0.02em;
-  background: linear-gradient(to right, #fff, #a5b4fc);
+  background: linear-gradient(to right, #fff, #80B722);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 body.theme-light .brand-text h1 {
-  background: linear-gradient(to right, #1e293b, #4f46e5);
+  background: linear-gradient(to right, #1e293b, #6ea01c);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -312,7 +318,7 @@ body.theme-light .theme-icon-dark { display: none; }
 
 .dropzone:hover, .dropzone.dragover {
   border-color: var(--primary);
-  background: rgba(99, 102, 241, 0.06);
+  background: rgba(128, 183, 34, 0.08);
   transform: scale(0.995);
 }
 
@@ -389,9 +395,9 @@ body.theme-light .theme-icon-dark { display: none; }
 }
 
 .mode-btn.active {
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(128, 183, 34, 0.18);
   border-color: var(--primary);
-  box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 0 12px rgba(128, 183, 34, 0.3);
 }
 
 .mode-title {
@@ -432,7 +438,7 @@ body.theme-light .theme-icon-dark { display: none; }
   border-color: var(--primary);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 10px rgba(128, 183, 34, 0.4);
 }
 
 .rule-hint-box {
@@ -625,7 +631,7 @@ body.theme-light .tabs-header {
 .tab-btn.active {
   color: #fff;
   background: var(--primary);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 12px rgba(128, 183, 34, 0.35);
 }
 
 .tab-badge {
@@ -698,7 +704,7 @@ body.theme-light .tabs-header {
 .search-box input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 3px rgba(128, 183, 34, 0.25);
 }
 
 .filter-controls {
@@ -720,7 +726,7 @@ body.theme-light .tabs-header {
 
 .form-select:focus, .form-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 3px rgba(128, 183, 34, 0.25);
 }
 
 /* Table styling */
@@ -807,7 +813,7 @@ body.theme-light .data-table th {
   white-space: nowrap;
 }
 
-.badge-primary { background: rgba(99, 102, 241, 0.18); color: #818cf8; }
+.badge-primary { background: rgba(128, 183, 34, 0.18); color: #80B722; }
 .badge-secondary { background: rgba(148, 163, 184, 0.18); color: var(--text-secondary); }
 .badge-success { background: var(--success-bg); color: var(--success); }
 .badge-danger { background: var(--danger-bg); color: var(--danger); }
@@ -838,7 +844,7 @@ body.theme-light .data-table th {
 .btn-primary {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 4px 12px rgba(128, 183, 34, 0.35);
 }
 
 .btn-primary:hover {
@@ -870,7 +876,7 @@ body.theme-light .data-table th {
 
 .btn-outline:hover {
   border-color: var(--primary);
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(128, 183, 34, 0.12);
 }
 
 .btn-text {
@@ -914,7 +920,7 @@ body.theme-light .data-table th {
 }
 
 .dropdown-item:hover {
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(128, 183, 34, 0.18);
   color: var(--primary);
 }
 
