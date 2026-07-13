@@ -1598,31 +1598,85 @@ function exportDisputeXLSX() {
 /**
  * Open Employee Detailed Daily Modal
  */
-function openEmployeeModal(empId) {
+function openEmployeeModal(empId, selectedMonth = 'ALL') {
   const emp = AppState.employeeSummary[empId];
   if (!emp) return;
 
   AppState.selectedEmployeeForModal = emp;
+  AppState.selectedModalMonth = selectedMonth || 'ALL';
 
   document.getElementById('modal-emp-title').textContent = AppState.lang === 'en' ? `👤 Attendance History : ${emp.empName}` : `👤 ประวัติเวลาเข้า-ออกงาน : ${emp.empName}`;
   document.getElementById('modal-emp-sub').textContent = AppState.lang === 'en' ? `Employee ID: ${emp.empId} | Dept: ${emp.dept}` : `รหัสพนักงาน: ${emp.empId} | แผนก: ${emp.dept}`;
 
+  // Find unique months in records (e.g. '2026-01', '2026-02')
+  const monthsSet = new Set();
+  emp.records.forEach(r => {
+    if (r.dateStr && r.dateStr.length >= 7) {
+      monthsSet.add(r.dateStr.slice(0, 7));
+    }
+  });
+  const monthsList = Array.from(monthsSet).sort();
+
+  const thMonths = { '01': 'ม.ค.', '02': 'ก.พ.', '03': 'มี.ค.', '04': 'เม.ย.', '05': 'พ.ค.', '06': 'มิ.ย.', '07': 'ก.ค.', '08': 'ส.ค.', '09': 'ก.ย.', '10': 'ต.ค.', '11': 'พ.ย.', '12': 'ธ.ค.' };
+  const enMonths = { '01': 'Jan', '02': 'Feb', '03': 'Mar', '04': 'Apr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Aug', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec' };
+
+  const pillsEl = document.getElementById('modal-month-pills');
+  if (pillsEl) {
+    let pillsHTML = `<button class="pill-btn ${AppState.selectedModalMonth === 'ALL' ? 'active' : ''}" onclick="openEmployeeModal('${emp.empId}', 'ALL')" style="padding: 0.35rem 0.85rem; font-size: 0.82rem;">${AppState.lang === 'en' ? '🗓️ All Months' : '🗓️ ทุกเดือน'}</button>`;
+    monthsList.forEach(mKey => {
+      const parts = mKey.split('-');
+      const y = parts[0] ? parts[0].slice(2) : '';
+      const mName = AppState.lang === 'en' ? (enMonths[parts[1]] || parts[1]) : (thMonths[parts[1]] || parts[1]);
+      const label = `${mName} ${y}`;
+      pillsHTML += `<button class="pill-btn ${AppState.selectedModalMonth === mKey ? 'active' : ''}" onclick="openEmployeeModal('${emp.empId}', '${mKey}')" style="padding: 0.35rem 0.85rem; font-size: 0.82rem;">${label}</button>`;
+    });
+    pillsEl.innerHTML = pillsHTML;
+  }
+
+  // Filter records based on selectedMonth
+  const filteredRecords = AppState.selectedModalMonth === 'ALL'
+    ? emp.records
+    : emp.records.filter(r => r.dateStr.startsWith(AppState.selectedModalMonth));
+
+  // Compute stats specifically for filtered records
+  let totalDaysWorked = 0;
+  let ontimeDays = 0;
+  let lateDays = 0;
+  let totalAllowance = 0;
+  const leaveStats = {};
+
+  filteredRecords.forEach(r => {
+    if (r.clockInSeconds > 0 || r.actualHours > 0 || r.leaveReason) {
+      totalDaysWorked++;
+    }
+    if ((r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate) {
+      ontimeDays++;
+    }
+    if (r.isLate) {
+      lateDays++;
+    }
+    totalAllowance += (r.allowance || 0);
+    if (r.leaveReason) {
+      leaveStats[r.leaveReason] = (leaveStats[r.leaveReason] || 0) + 1;
+    }
+  });
+
   const dayUnit = AppState.lang === 'en' ? 'Days' : 'วัน';
-  document.getElementById('m-stat-total').textContent = `${emp.totalDaysWorked} ${dayUnit}`;
-  document.getElementById('m-stat-ontime').textContent = `${emp.ontimeDays} ${dayUnit}`;
-  document.getElementById('m-stat-late').textContent = `${emp.lateDays} ${dayUnit}`;
-  document.getElementById('m-stat-allowance').textContent = `${emp.totalAllowance.toLocaleString()} ฿`;
+  document.getElementById('m-stat-total').textContent = `${totalDaysWorked} ${dayUnit}`;
+  document.getElementById('m-stat-ontime').textContent = `${ontimeDays} ${dayUnit}`;
+  document.getElementById('m-stat-late').textContent = `${lateDays} ${dayUnit}`;
+  document.getElementById('m-stat-allowance').textContent = `${totalAllowance.toLocaleString()} ฿`;
 
   // Leave Stats
   const leaveEl = document.getElementById('m-stat-leave');
-  if (Object.keys(emp.leaveStats).length > 0) {
-    leaveEl.innerHTML = Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap;">- ${reason}: ${count} วัน</div>`).join('');
+  if (Object.keys(leaveStats).length > 0) {
+    leaveEl.innerHTML = Object.entries(leaveStats).map(([reason, count]) => `<div style="white-space:nowrap;">- ${reason}: ${count} วัน</div>`).join('');
   } else {
     leaveEl.textContent = '-';
   }
 
   // Sort employee records by date descending
-  const sortedRecords = [...emp.records].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+  const sortedRecords = [...filteredRecords].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
 
   const tbody = document.getElementById('modal-tbody');
   tbody.innerHTML = sortedRecords.map(r => {
@@ -1772,7 +1826,11 @@ function exportSummaryCSV() {
  * Export Individual Employee Modal records to Excel
  */
 function exportEmployeeModalXLSX(emp) {
-  const records = emp.records.map(r => ({
+  const recordsToExport = AppState.selectedModalMonth && AppState.selectedModalMonth !== 'ALL'
+    ? emp.records.filter(r => r.dateStr.startsWith(AppState.selectedModalMonth))
+    : emp.records;
+
+  const records = recordsToExport.map(r => ({
     'วันที่': r.dateStr,
     'วันในสัปดาห์': r.dayNameFull,
     'กะงาน': r.dwsText,
@@ -1786,10 +1844,11 @@ function exportEmployeeModalXLSX(emp) {
     'ค่าข้าว 25฿': r.allowance
   }));
 
+  const suffix = AppState.selectedModalMonth && AppState.selectedModalMonth !== 'ALL' ? `_${AppState.selectedModalMonth}` : '';
   const worksheet = XLSX.utils.json_to_sheet(records);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, `Emp_${emp.empId}`);
-  XLSX.writeFile(workbook, `Emp_${emp.empId}_Attendance_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.writeFile(workbook, `Emp_${emp.empId}_Attendance${suffix}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 // Expose global modal functions for onclick attributes
