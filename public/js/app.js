@@ -1754,29 +1754,29 @@ function openEmployeeModal(empId, selectedMonth = 'ALL') {
     });
 
     kpiEl.innerHTML = `
-      <div style="margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
-        <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
-          💡 บทวิเคราะห์พฤติกรรมการเข้างาน & ข้อมูลประเมิน KPI (Attendance Analytics Insights)
+      <div style="margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.4rem; flex-wrap: wrap; gap: 0.4rem;">
+        <span style="font-size: 0.88rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+          💡 บทวิเคราะห์พฤติกรรม & ประเมิน KPI
         </span>
-        <span class="badge ${gradeBadgeClass}" style="font-size: 0.85rem; padding: 0.35rem 0.85rem; border-radius: 50px;">
-          เกรดประเมิน KPI: ${gradeText}
+        <span class="badge ${gradeBadgeClass}" style="font-size: 0.78rem; padding: 0.25rem 0.65rem; border-radius: 50px;">
+          เกรด KPI: ${gradeText}
         </span>
       </div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.85rem;">
-        <div style="background: rgba(0,0,0,0.22); padding: 0.85rem; border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
-          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.25rem;">🏆 คะแนนความตรงเวลา (Punctuality Score)</div>
-          <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.25rem;">${punctualityScore}% <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-secondary);">(${ontimeDays} / ${workDaysCount || 1} วัน)</span></div>
-          <div style="font-size: 0.75rem; color: ${gradeColor}; font-weight: 600;">เกณฑ์ประเมิน: ${gradeText.split(' ')[0]}</div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem;">
+        <div style="background: rgba(0,0,0,0.22); padding: 0.6rem; border-radius: var(--radius-sm); border-left: 3px solid var(--primary);">
+          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 0.15rem;">🏆 คะแนนความตรงเวลา</div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.15rem;">${punctualityScore}% <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-secondary);">(${ontimeDays}/${workDaysCount || 1}วัน)</span></div>
+          <div style="font-size: 0.72rem; color: ${gradeColor}; font-weight: 600;">เกณฑ์: ${gradeText.split(' ')[0]}</div>
         </div>
-        <div style="background: rgba(0,0,0,0.22); padding: 0.85rem; border-radius: var(--radius-sm); border-left: 4px solid ${lateDays > 0 ? '#ef4444' : '#10b981'};">
-          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.25rem;">⚠️ รูปแบบการมาสาย (Lateness Pattern Analysis)</div>
-          <div style="font-size: 1.0rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">${latePatternSummary}</div>
-          <div style="font-size: 0.75rem; color: var(--text-secondary);">${latePatternDetail}</div>
+        <div style="background: rgba(0,0,0,0.22); padding: 0.6rem; border-radius: var(--radius-sm); border-left: 3px solid ${lateDays > 0 ? '#ef4444' : '#10b981'};">
+          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 0.15rem;">⚠️ รูปแบบการมาสาย (Pattern)</div>
+          <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.15rem;">${latePatternSummary}</div>
+          <div style="font-size: 0.7rem; color: var(--text-secondary); line-height: 1.2;">${latePatternDetail}</div>
         </div>
-        <div style="background: rgba(0,0,0,0.22); padding: 0.85rem; border-radius: var(--radius-sm); border-left: 4px solid #3b82f6;">
-          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.25rem;">⏱️ เวลาเข้างานเฉลี่ย (Average Clock-in)</div>
-          <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.25rem;">${avgClockInStr} <span style="font-size:0.75rem; font-weight:normal; color:var(--success);">${earlyDeltaText}</span></div>
-          <div style="font-size: 0.75rem; color: #3b82f6;">🔥 สถิติตรงเวลาต่อเนื่อง: <strong>${maxStreak} วันทำการติดกัน</strong></div>
+        <div style="background: rgba(0,0,0,0.22); padding: 0.6rem; border-radius: var(--radius-sm); border-left: 3px solid #3b82f6;">
+          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 0.15rem;">⏱️ เวลาเข้าเฉลี่ย & Streak</div>
+          <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.15rem;">${avgClockInStr} <span style="font-size:0.7rem; font-weight:normal; color:var(--success);">${earlyDeltaText}</span></div>
+          <div style="font-size: 0.72rem; color: #3b82f6;">🔥 ตรงเวลา: <strong>${maxStreak} วันทำการติดกัน</strong></div>
         </div>
       </div>
     `;
