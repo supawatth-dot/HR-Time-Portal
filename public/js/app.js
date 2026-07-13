@@ -86,6 +86,8 @@ function setupEventListeners() {
       const badge = document.getElementById('current-mode-badge');
       if (AppState.mode === 'workshop') {
         badge.textContent = AppState.lang === 'en' ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
+      } else if (AppState.mode === 'night') {
+        badge.textContent = AppState.lang === 'en' ? 'Night/Shift Mode (15:00, 15:30, 16:00, 17:30)' : '🌙 โหมดกะบ่าย/กะดึก (15:00, 15:30, 16:00, 17:30)';
       } else {
         badge.textContent = AppState.lang === 'en' ? 'Office Mode (Before 09:00, 8hrs+)' : 'โหมด Office (ไม่เกิน 09:00, 8ชม.+)';
       }
@@ -99,6 +101,10 @@ function setupEventListeners() {
           hintSpan.textContent = AppState.lang === 'en' 
             ? (min === 0 ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}`)
             : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
+        } else if (AppState.mode === 'night') {
+          hintSpan.textContent = AppState.lang === 'en'
+            ? `4 Night Shifts Auto-Detected (+${min}m tolerance)`
+            : `ตรวจจับอัตโนมัติ 4 กะบ่าย/ข้ามวัน (15:00, 15:30, 16:00, 17:30) ผ่อนผัน ${min} นาที`;
         } else {
           hintSpan.textContent = AppState.lang === 'en'
             ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
@@ -125,6 +131,10 @@ function setupEventListeners() {
           hintSpan.textContent = AppState.lang === 'en' 
             ? (min === 0 ? 'Mon-Thu 08:00 Strict, Fri/Pre 07:00 Strict' : `Mon-Thu 08:${mm}, Fri/Pre 07:${mm}`)
             : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
+        } else if (AppState.mode === 'night') {
+          hintSpan.textContent = AppState.lang === 'en'
+            ? `4 Night Shifts Auto-Detected (+${min}m tolerance)`
+            : `ตรวจจับอัตโนมัติ 4 กะบ่าย/ข้ามวัน (15:00, 15:30, 16:00, 17:30) ผ่อนผัน ${min} นาที`;
         } else {
           hintSpan.textContent = AppState.lang === 'en'
             ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
@@ -288,6 +298,8 @@ function applyLanguage() {
   if (badge) {
     if (AppState.mode === 'workshop') {
       badge.textContent = isEn ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
+    } else if (AppState.mode === 'night') {
+      badge.textContent = isEn ? 'Night/Shift Mode (15:00, 15:30, 16:00, 17:30)' : '🌙 โหมดกะบ่าย/กะดึก (15:00, 15:30, 16:00, 17:30)';
     } else {
       badge.textContent = isEn ? 'Office Mode (Before 09:00, 8hrs+)' : 'โหมด Office (ไม่เกิน 09:00, 8ชม.+)';
     }
@@ -321,6 +333,8 @@ function applyLanguage() {
   if (modeDescs[0]) modeDescs[0].textContent = isEn ? 'Mon-Thu 08:00 | Fri & Pre-Holiday 07:00' : 'จ-พฤ เข้า 08:00 น. | ศ และก่อนวันหยุด เข้า 07:00 น.';
   if (modeTitles[1]) modeTitles[1].textContent = isEn ? '📋 Office Mode' : '📋 โหมดพนักงานออฟฟิศ (Office)';
   if (modeDescs[1]) modeDescs[1].textContent = isEn ? 'Clock in <= 09:00, Work >= 8h for allowance' : 'เข้างานไม่เกิน 09:00 น. ทำงานครบ 8 ชม. จะได้รับค่าข้าว';
+  if (modeTitles[2]) modeTitles[2].textContent = isEn ? '🌙 Night & Auto-Shift Mode' : '🌙 โหมดกะบ่าย/กะดึก (Night & Auto Shift)';
+  if (modeDescs[2]) modeDescs[2].textContent = isEn ? 'Supports 4 Afternoon/Night Shifts (15:00, 15:30, 16:00, 17:30)' : 'รองรับ 4 กะเข้าบ่าย-ออกเช้าอีกวัน (15:00, 15:30, 16:00, 17:30)';
 
   // Late tolerance pills
   const pillBtns = document.querySelectorAll('.pill-btn');
@@ -692,11 +706,11 @@ function getDayOfWeekSafe(dateStr) {
 function excelSerialToTimeInfo(serialTime) {
   if (typeof serialTime === 'string') {
     const s = serialTime.trim();
-    if (s.includes(':')) {
-      const parts = s.split(':').map(part => parseInt(part, 10));
-      const hh = !isNaN(parts[0]) ? parts[0] : 0;
-      const mm = !isNaN(parts[1]) ? parts[1] : 0;
-      const ss = !isNaN(parts[2]) ? parts[2] : 0;
+    const timeMatch = s.match(/^(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?$/);
+    if (timeMatch) {
+      const hh = parseInt(timeMatch[1], 10) || 0;
+      const mm = parseInt(timeMatch[2], 10) || 0;
+      const ss = parseInt(timeMatch[3] || '0', 10) || 0;
       const totalSeconds = hh * 3600 + mm * 60 + ss;
       return {
         str: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
@@ -734,6 +748,71 @@ function parseTargetSecondsFromDWS(dwsText) {
     return hh * 3600 + mm * 60;
   }
   return null;
+}
+
+/**
+ * Detect Target Shift & Night Shift Auto-Classification Engine
+ * Supports 4 Afternoon/Night Shifts crossing midnight (เข้าบ่าย ออกเช้าของอีกวัน):
+ * 1. 15:00 - 01:00 (หรือ 03.00 - 01.00) -> Target: 15:00 (54000s)
+ * 2. 15:30 - 00:30 (หรือ 03.30 - 00.30) -> Target: 15:30 (55800s)
+ * 3. 16:00 - 03:30 (หรือ 04.00 - 03.30) -> Target: 16:00 (57600s)
+ * 4. 17:30 - 03:30 (หรือ 05.30 - 03.30) -> Target: 17:30 (63000s)
+ */
+function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHoliday, mode) {
+  const dws = String(dwsText || '').trim().toLowerCase();
+  
+  // Normalize 12-hour afternoon clock-in if recorded as e.g. 03:30 (12600s) or 04:00 (14400s) when exit is after midnight (00:00 - 06:00)
+  let normInSecs = clockInSeconds;
+  if (clockInSeconds >= 7200 && clockInSeconds <= 21600 && clockOutSeconds > 0 && clockOutSeconds <= 21600) {
+    normInSecs += 43200;
+  }
+  
+  // 1. Check DWS text patterns or explicit Night Shift keywords
+  if (dws.includes('15:00') || dws.includes('15.00') || /\b03[:.]00\b.*\b01[:.]00\b/.test(dws) || dws.includes('n1')) {
+    return { targetSeconds: 54000, targetStr: '15:00 (N1)', isNightShift: true, normInSecs };
+  }
+  if (dws.includes('15:30') || dws.includes('15.30') || /\b03[:.]30\b.*\b00[:.]30\b/.test(dws) || dws.includes('n2')) {
+    return { targetSeconds: 55800, targetStr: '15:30 (N2)', isNightShift: true, normInSecs };
+  }
+  if (dws.includes('16:00') || dws.includes('16.00') || /\b04[:.]00\b.*\b03[:.]30\b/.test(dws) || dws.includes('n3')) {
+    return { targetSeconds: 57600, targetStr: '16:00 (N3)', isNightShift: true, normInSecs };
+  }
+  if (dws.includes('17:30') || dws.includes('17.30') || /\b05[:.]30\b.*\b03[:.]30\b/.test(dws) || dws.includes('n4') || dws.includes('night') || dws.includes('ดึก') || dws.includes('บ่าย')) {
+    return { targetSeconds: 63000, targetStr: '17:30 (N4)', isNightShift: true, normInSecs };
+  }
+
+  // 2. If mode === 'night' OR if clock-in is in afternoon/evening window (14:00 - 21:00)
+  if (mode === 'night' || (normInSecs >= 50400 && normInSecs <= 75600)) {
+    if (normInSecs <= 54900) { // <= 15:15 -> Shift N1 (15:00)
+      return { targetSeconds: 54000, targetStr: '15:00 (N1)', isNightShift: true, normInSecs };
+    } else if (normInSecs <= 56700) { // 15:15 to 15:45 -> Shift N2 (15:30)
+      return { targetSeconds: 55800, targetStr: '15:30 (N2)', isNightShift: true, normInSecs };
+    } else if (normInSecs <= 60300) { // 15:45 to 16:45 -> Shift N3 (16:00)
+      return { targetSeconds: 57600, targetStr: '16:00 (N3)', isNightShift: true, normInSecs };
+    } else { // > 16:45 -> Shift N4 (17:30)
+      return { targetSeconds: 63000, targetStr: '17:30 (N4)', isNightShift: true, normInSecs };
+    }
+  }
+
+  // 3. Check for standard 24h targets in DWS (e.g. 08:00, 09:00, 07:00)
+  const parseSecs = parseTargetSecondsFromDWS(dwsText);
+  if (parseSecs !== null) {
+    const hh = Math.floor(parseSecs / 3600);
+    const mm = Math.floor((parseSecs % 3600) / 60);
+    return { targetSeconds: parseSecs, targetStr: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, isNightShift: hh >= 14, normInSecs };
+  }
+
+  // 4. Default Day Shifts
+  if (mode === 'workshop') {
+    if (isPreHoliday) {
+      return { targetSeconds: 25200, targetStr: '07:00', isNightShift: false, normInSecs };
+    } else {
+      return { targetSeconds: 28800, targetStr: '08:00', isNightShift: false, normInSecs };
+    }
+  } else {
+    // Mode 'dws'
+    return { targetSeconds: 32400, targetStr: '09:00', isNightShift: false, normInSecs };
+  }
 }
 
 /**
@@ -802,22 +881,18 @@ function recalculateAndRenderAll() {
     const preHolidayReason = AppState.preHolidaysMap[dateStr];
     const isPreHoliday = isFriday || !!preHolidayReason;
 
-    // Determine target start time
-    let targetSeconds = 28800; // 08:00
-    let targetStr = '08:00';
+    // Determine target start time & detect night shift / afternoon shift
+    const shiftInfo = detectShiftTarget(dwsText, clockInInfo.seconds, clockOutInfo.seconds, isPreHoliday, AppState.mode);
+    const targetSeconds = shiftInfo.targetSeconds;
+    const targetStr = shiftInfo.targetStr;
+    const isNightShift = shiftInfo.isNightShift;
 
-    if (AppState.mode === 'workshop') {
-      if (isPreHoliday) {
-        targetSeconds = 25200; // 07:00
-        targetStr = '07:00';
-      } else {
-        targetSeconds = 28800; // 08:00
-        targetStr = '08:00';
-      }
-    } else {
-      // Mode 'dws' (Office Mode)
-      targetSeconds = 32400; // 09:00
-      targetStr = '09:00';
+    // Normalize 12-hour clock-in notation (e.g. 03:30 -> 15:30) if applicable
+    if (shiftInfo.normInSecs && shiftInfo.normInSecs !== clockInInfo.seconds && clockInInfo.seconds > 0) {
+      clockInInfo.seconds = shiftInfo.normInSecs;
+      const hh = Math.floor(clockInInfo.seconds / 3600);
+      const mm = Math.floor((clockInInfo.seconds % 3600) / 60);
+      clockInInfo.str = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     }
 
     if (isPreHoliday && clockInInfo.seconds > 0) {
@@ -859,9 +934,9 @@ function recalculateAndRenderAll() {
         isLate = false;
         lateMinutes = 0;
         
-        if (AppState.mode === 'dws' && actualHours < 8) {
+        if ((AppState.mode === 'dws' || AppState.mode === 'night') && actualHours < 8 && actualHours > 0) {
           allowance = 0; // อดค่าข้าว 25 บาท! (ทำงานไม่ครบ 8 ชม.)
-          statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ)';
+          statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ 8 ชม.)';
         } else if (leaveReason) {
           allowance = 0; // อดค่าข้าว (มีการลา)
           statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. Leave)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว วันลา)';
@@ -870,7 +945,9 @@ function recalculateAndRenderAll() {
           statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว ส-อา)';
         } else {
           allowance = 25; // ได้ค่าข้าว 25 บาท!
-          statusText = AppState.lang === 'en' ? '✅ On Time (+25฿)' : '✅ ตรงเวลา (+25฿)';
+          statusText = AppState.lang === 'en' 
+            ? (isNightShift ? `✅ On Time (+25฿ ${targetStr})` : '✅ On Time (+25฿)') 
+            : (isNightShift ? `✅ ตรงเวลา (+25฿ กะ ${targetStr})` : '✅ ตรงเวลา (+25฿)');
         }
         totalOntimeDays++;
       }

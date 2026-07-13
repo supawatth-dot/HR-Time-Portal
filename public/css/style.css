@@ -373,7 +373,7 @@ body.theme-light .theme-icon-dark { display: none; }
 
 .mode-toggle-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 0.75rem;
 }
 
