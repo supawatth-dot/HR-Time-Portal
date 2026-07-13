@@ -91,7 +91,7 @@ function setupEventListeners() {
       if (AppState.mode === 'workshop') {
         badge.textContent = AppState.lang === 'en' ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
       } else if (AppState.mode === 'night') {
-        badge.textContent = AppState.lang === 'en' ? 'Night/Shift Mode (15:00, 15:30, 16:00, 17:30)' : '🌙 โหมดกะบ่าย/กะดึก (15:00, 15:30, 16:00, 17:30)';
+        badge.textContent = AppState.lang === 'en' ? 'Night/Shift Mode (15:30, 16:30)' : '🌙 โหมดกะบ่าย/กะดึก (15:30, 16:30)';
       } else {
         badge.textContent = AppState.lang === 'en' ? 'Office Mode (Before 09:00, 8hrs+)' : 'โหมด Office (ไม่เกิน 09:00, 8ชม.+)';
       }
@@ -107,8 +107,8 @@ function setupEventListeners() {
             : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
         } else if (AppState.mode === 'night') {
           hintSpan.textContent = AppState.lang === 'en'
-            ? `4 Night Shifts Auto-Detected (+${min}m tolerance)`
-            : `ตรวจจับอัตโนมัติ 4 กะบ่าย/ข้ามวัน (15:00, 15:30, 16:00, 17:30) ผ่อนผัน ${min} นาที`;
+            ? `2 Night Shifts Auto-Detected (15:30-00:30 & 16:30-01:30) (+${min}m tolerance)`
+            : `ตรวจจับอัตโนมัติ 2 กะกลางคืน (15:30 ออก 00:30, 16:30 ออก 01:30) ผ่อนผัน ${min} นาที`;
         } else {
           hintSpan.textContent = AppState.lang === 'en'
             ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
@@ -137,8 +137,8 @@ function setupEventListeners() {
             : (min === 0 ? 'จ-พฤ 08:00 น. ตรงเป๊ะ, ศ และก่อนวันหยุด 07:00 น.' : `จ-พฤ 08:${mm} น., ศ และก่อนวันหยุด 07:${mm} น.`);
         } else if (AppState.mode === 'night') {
           hintSpan.textContent = AppState.lang === 'en'
-            ? `4 Night Shifts Auto-Detected (+${min}m tolerance)`
-            : `ตรวจจับอัตโนมัติ 4 กะบ่าย/ข้ามวัน (15:00, 15:30, 16:00, 17:30) ผ่อนผัน ${min} นาที`;
+            ? `2 Night Shifts Auto-Detected (15:30-00:30 & 16:30-01:30) (+${min}m tolerance)`
+            : `ตรวจจับอัตโนมัติ 2 กะกลางคืน (15:30 ออก 00:30, 16:30 ออก 01:30) ผ่อนผัน ${min} นาที`;
         } else {
           hintSpan.textContent = AppState.lang === 'en'
             ? (min === 0 ? 'Before 09:00 Strict, Work 8h+' : `Before 09:${mm}, Work 8h+`)
@@ -191,13 +191,13 @@ function setupEventListeners() {
 
   // Summary Filters
   document.getElementById('summary-search-input').addEventListener('input', renderSummaryTable);
-  document.getElementById('summary-dept-filter').addEventListener('change', renderSummaryTable);
+  document.getElementById('summary-dept-filter').addEventListener('change', (e) => { e.target.dataset.userFiltered = 'true'; renderSummaryTable(); });
   document.getElementById('summary-sort-select').addEventListener('change', renderSummaryTable);
 
   // Daily Filters
   document.getElementById('daily-search-input').addEventListener('input', () => { AppState.dailyPage = 1; renderDailyTable(); });
   document.getElementById('daily-month-filter').addEventListener('change', () => { AppState.dailyPage = 1; renderDailyTable(); });
-  document.getElementById('daily-dept-filter').addEventListener('change', () => { AppState.dailyPage = 1; renderDailyTable(); });
+  document.getElementById('daily-dept-filter').addEventListener('change', (e) => { e.target.dataset.userFiltered = 'true'; AppState.dailyPage = 1; renderDailyTable(); });
   document.getElementById('daily-status-filter').addEventListener('change', () => { AppState.dailyPage = 1; renderDailyTable(); });
 
   // Holiday Form
@@ -306,7 +306,7 @@ function applyLanguage() {
     if (AppState.mode === 'workshop') {
       badge.textContent = isEn ? 'Workshop Rules (08:00/07:00)' : 'กฎ Workshop (08:00/07:00)';
     } else if (AppState.mode === 'night') {
-      badge.textContent = isEn ? 'Night/Shift Mode (15:00, 15:30, 16:00, 17:30)' : '🌙 โหมดกะบ่าย/กะดึก (15:00, 15:30, 16:00, 17:30)';
+      badge.textContent = isEn ? 'Night/Shift Mode (15:30, 16:30)' : '🌙 โหมดกะบ่าย/กะดึก (15:30, 16:30)';
     } else {
       badge.textContent = isEn ? 'Office Mode (Before 09:00, 8hrs+)' : 'โหมด Office (ไม่เกิน 09:00, 8ชม.+)';
     }
@@ -341,7 +341,7 @@ function applyLanguage() {
   if (modeTitles[1]) modeTitles[1].textContent = isEn ? '📋 Office Mode' : '📋 โหมดพนักงานออฟฟิศ (Office)';
   if (modeDescs[1]) modeDescs[1].textContent = isEn ? 'Clock in <= 09:00, Work >= 8h for allowance' : 'เข้างานไม่เกิน 09:00 น. ทำงานครบ 8 ชม. จะได้รับค่าข้าว';
   if (modeTitles[2]) modeTitles[2].textContent = isEn ? '🌙 Night & Auto-Shift Mode' : '🌙 โหมดกะบ่าย/กะดึก (Night & Auto Shift)';
-  if (modeDescs[2]) modeDescs[2].textContent = isEn ? 'Supports 4 Afternoon/Night Shifts (15:00, 15:30, 16:00, 17:30)' : 'รองรับ 4 กะเข้าบ่าย-ออกเช้าอีกวัน (15:00, 15:30, 16:00, 17:30)';
+  if (modeDescs[2]) modeDescs[2].textContent = isEn ? 'Supports 2 Night Shifts (15:30-00:30 & 16:30-01:30)' : 'รองรับ 2 กะกลางคืน (15:30 ออก 00:30 และ 16:30 ออก 01:30)';
 
   // Late tolerance pills
   const pillBtns = document.querySelectorAll('.pill-btn');
@@ -498,15 +498,23 @@ function setupCustomRulesEventListeners() {
         return;
       }
       
-      let matchedId = empIdOrName;
-      if (!AppState.employeeSummary[empIdOrName]) {
+      let matchedId = null;
+      const firstToken = empIdOrName.split(/\s+/)[0];
+      if (AppState.employeeSummary[firstToken]) {
+        matchedId = firstToken;
+      } else if (AppState.employeeSummary[empIdOrName]) {
+        matchedId = empIdOrName;
+      } else {
+        const query = empIdOrName.toLowerCase();
         for (const [id, summary] of Object.entries(AppState.employeeSummary)) {
-          if (id === empIdOrName || summary.name.toLowerCase().includes(empIdOrName.toLowerCase())) {
+          const eName = (summary.empName || summary.name || '').toLowerCase();
+          if (id.toLowerCase() === query || eName.includes(query) || query.includes(id.toLowerCase()) || (eName && query.includes(eName))) {
             matchedId = id;
             break;
           }
         }
       }
+      if (!matchedId) matchedId = firstToken || empIdOrName;
 
       AppState.empRuleMap[matchedId] = select.value;
       localStorage.setItem('hr_time_emp_rules_v1', JSON.stringify(AppState.empRuleMap));
@@ -634,7 +642,7 @@ function renderEmpRulesTable() {
 
   empIds.forEach(empId => {
     const mode = AppState.empRuleMap[empId];
-    const summary = AppState.employeeSummary[empId] || { name: 'ไม่ทราบชื่อ', dept: '-' };
+    const summary = AppState.employeeSummary[empId] || { empName: 'ไม่ทราบชื่อ', dept: '-' };
     let modeLabel = mode;
     if (mode === 'workshop') modeLabel = '⭐ โหมด Workshop (08:00/07:00 น.)';
     else if (mode === 'dws') modeLabel = '📋 โหมด Office (ไม่เกิน 09:00 น.)';
@@ -643,7 +651,7 @@ function renderEmpRulesTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="font-mono font-bold">${empId}</td>
-      <td>${summary.name}</td>
+      <td>${summary.empName || summary.name || 'ไม่ทราบชื่อ'}</td>
       <td><span class="badge badge-secondary">${summary.dept}</span></td>
       <td><span class="badge badge-primary">${modeLabel}</span></td>
       <td style="text-align: center;">
@@ -990,11 +998,9 @@ function excelSerialToTimeInfo(serialTime) {
 
 /**
  * Parse Target Time in Seconds from DWS Text (e.g. "WD 08:00-17:00" -> 08:00:00 = 28800)
- * Uses explicit parseInt with radix 10 to guarantee immunity from Octal parsing hazards on strings starting with 0 (e.g. 08:00, 09:00).
  */
 function parseTargetSecondsFromDWS(dwsText) {
   if (!dwsText || typeof dwsText !== 'string') return null;
-  // Look for pattern like 08:00 or 07:00 or 8:30 or 08.00
   const match = dwsText.match(/(\d{1,2})[:.](\d{2})/);
   if (match) {
     const hh = parseInt(match[1], 10);
@@ -1007,16 +1013,21 @@ function parseTargetSecondsFromDWS(dwsText) {
 
 /**
  * Detect Target Shift & Night Shift Auto-Classification Engine
- * Supports 4 Afternoon/Night Shifts crossing midnight (เข้าบ่าย ออกเช้าของอีกวัน):
- * 1. 15:00 - 01:00 (หรือ 03.00 - 01.00) -> Target: 15:00 (54000s)
- * 2. 15:30 - 00:30 (หรือ 03.30 - 00.30) -> Target: 15:30 (55800s)
- * 3. 16:00 - 03:30 (หรือ 04.00 - 03.30) -> Target: 16:00 (57600s)
- * 4. 17:30 - 03:30 (หรือ 05.30 - 03.30) -> Target: 17:30 (63000s)
+ * Supports exactly 2 Night Shifts crossing midnight (15:30-00:30 and 16:30-01:30):
  */
-function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHoliday, mode, empId, dateStr) {
+function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHoliday, mode, empId, dateStr, dept) {
   const dws = String(dwsText || '').trim().toLowerCase();
   
-  // 0. Check Master Shift Map (from Data/shipt / Data/shift) for exact assigned schedule
+  const isWorkshop = dept && String(dept).toLowerCase().includes('workshop');
+  if (isWorkshop) {
+    if (isPreHoliday) {
+      return { targetSeconds: 25200, targetOutSeconds: 57600, targetStr: '07:00-16:00', isNightShift: false, normInSecs: clockInSeconds };
+    } else {
+      return { targetSeconds: 28800, targetOutSeconds: 61200, targetStr: '08:00-17:00', isNightShift: false, normInSecs: clockInSeconds };
+    }
+  }
+  
+  // 0. Check Master Shift Map (from Data/shift) for exact assigned schedule
   if (empId && dateStr && AppState && AppState.shiftMasterMap) {
     const key1 = `${empId}_${dateStr}`;
     const key2 = `${parseInt(empId, 10)}_${dateStr}`;
@@ -1028,6 +1039,7 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
       }
       return {
         targetSeconds: masterInfo.targetSeconds,
+        targetOutSeconds: masterInfo.targetOutSeconds || (masterInfo.targetSeconds + 32400),
         targetStr: masterInfo.targetStr,
         isNightShift: masterInfo.isNightShift,
         normInSecs: normInSecs,
@@ -1042,48 +1054,37 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
     normInSecs += 43200;
   }
   
-  // 1. Check DWS text patterns or explicit Night Shift keywords
-  if (dws.includes('15:00') || dws.includes('15.00') || /\b03[:.]00\b.*\b01[:.]00\b/.test(dws) || dws.includes('n1')) {
-    return { targetSeconds: 54000, targetStr: '15:00 (N1)', isNightShift: true, normInSecs };
-  }
-  if (dws.includes('15:30') || dws.includes('15.30') || /\b03[:.]30\b.*\b00[:.]30\b/.test(dws) || dws.includes('n2')) {
-    return { targetSeconds: 55800, targetStr: '15:30 (N2)', isNightShift: true, normInSecs };
-  }
-  if (dws.includes('16:00') || dws.includes('16.00') || /\b04[:.]00\b.*\b03[:.]30\b/.test(dws) || dws.includes('n3')) {
-    return { targetSeconds: 57600, targetStr: '16:00 (N3)', isNightShift: true, normInSecs };
-  }
-  if (dws.includes('17:30') || dws.includes('17.30') || /\b05[:.]30\b.*\b03[:.]30\b/.test(dws) || dws.includes('n4') || dws.includes('night') || dws.includes('ดึก') || dws.includes('บ่าย')) {
-    return { targetSeconds: 63000, targetStr: '17:30 (N4)', isNightShift: true, normInSecs };
-  }
-
-  // 2. If mode === 'night' OR if clock-in is in afternoon/evening window (14:00 - 21:00)
-  if (mode === 'night' || (normInSecs >= 50400 && normInSecs <= 75600)) {
-    if (normInSecs <= 54900) {
-      return { targetSeconds: 54000, targetStr: '15:00 (N1)', isNightShift: true, normInSecs };
-    } else if (normInSecs <= 56700) {
-      return { targetSeconds: 55800, targetStr: '15:30 (N2)', isNightShift: true, normInSecs };
-    } else if (normInSecs <= 60300) {
-      return { targetSeconds: 57600, targetStr: '16:00 (N3)', isNightShift: true, normInSecs };
-    } else {
-      return { targetSeconds: 63000, targetStr: '17:30 (N4)', isNightShift: true, normInSecs };
+  // 1. Check DWS text patterns or explicit Night Shift keywords (Exactly two shifts: 15:30-00:30 and 16:30-01:30)
+  const isNightInterval = /\b(15|16|17)[:.](00|30)\b.*\b(00|01|02|03)[:.](00|30)\b/.test(dws) || dws.includes('n1') || dws.includes('n2') || dws.includes('night') || dws.includes('ดึก') || dws.includes('บ่าย') || mode === 'night';
+  if (isNightInterval || (normInSecs >= 50400 && normInSecs <= 75600)) {
+    if (dws.includes('15:30') || dws.includes('15.30') || dws.includes('15:00') || dws.includes('15.00') || dws.includes('n1') || (normInSecs <= 57600 && mode === 'night')) {
+      return { targetSeconds: 55800, targetOutSeconds: 88200, targetStr: '15:30-00:30', isNightShift: true, normInSecs };
     }
+    return { targetSeconds: 59400, targetOutSeconds: 91800, targetStr: '16:30-01:30', isNightShift: true, normInSecs };
   }
 
-  // 3. Check for standard 24h targets in DWS
+  // 3. If mode === 'dws' (Office Mode), check-in ceiling is 09:00 (32400s)
+  if (mode === 'dws') {
+    const parseSecs = parseTargetSecondsFromDWS(dwsText);
+    if (parseSecs !== null && parseSecs > 32400) {
+      const hh = Math.floor(parseSecs / 3600);
+      const mm = Math.floor((parseSecs % 3600) / 60);
+      return { targetSeconds: parseSecs, targetOutSeconds: parseSecs + 32400, targetStr: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, isNightShift: hh >= 14, normInSecs };
+    }
+    return { targetSeconds: 32400, targetOutSeconds: 64800, targetStr: '09:00-18:00', isNightShift: false, normInSecs };
+  }
+
+  // 4. Check for standard 24h targets in DWS
   const parseSecs = parseTargetSecondsFromDWS(dwsText);
   if (parseSecs !== null) {
     const hh = Math.floor(parseSecs / 3600);
     const mm = Math.floor((parseSecs % 3600) / 60);
-    return { targetSeconds: parseSecs, targetStr: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, isNightShift: hh >= 14, normInSecs };
+    return { targetSeconds: parseSecs, targetOutSeconds: parseSecs + 32400, targetStr: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, isNightShift: hh >= 14, normInSecs };
   }
 
-  // 4. Default Day Shifts
-  if (mode === 'workshop') {
-    if (isPreHoliday) return { targetSeconds: 25200, targetStr: '07:00', isNightShift: false, normInSecs };
-    else return { targetSeconds: 28800, targetStr: '08:00', isNightShift: false, normInSecs };
-  } else {
-    return { targetSeconds: 32400, targetStr: '09:00', isNightShift: false, normInSecs };
-  }
+  // 5. Default Day Shifts (Workshop)
+  if (isPreHoliday) return { targetSeconds: 25200, targetOutSeconds: 57600, targetStr: '07:00-16:00', isNightShift: false, normInSecs };
+  else return { targetSeconds: 28800, targetOutSeconds: 61200, targetStr: '08:00-17:00', isNightShift: false, normInSecs };
 }
 
 /**
@@ -1098,6 +1099,7 @@ function recalculateAndRenderAll() {
   
   let totalOntimeDays = 0;
   let totalLateDays = 0;
+  let totalEarlyOutDays = 0;
   let totalPreHolidayShifts = 0;
   let minDate = '9999-99-99';
   let maxDate = '0000-00-00';
@@ -1142,10 +1144,15 @@ function recalculateAndRenderAll() {
     const isPreHoliday = isFriday || !!preHolidayReason;
 
     const effectiveMode = (AppState.empRuleMap && AppState.empRuleMap[empId]) || (AppState.deptRuleMap && AppState.deptRuleMap[dept]) || AppState.mode;
-    const shiftInfo = detectShiftTarget(dwsText, clockInInfo.seconds, clockOutInfo.seconds, isPreHoliday, effectiveMode, empId, dateStr);
+    const shiftInfo = detectShiftTarget(dwsText, clockInInfo.seconds, clockOutInfo.seconds, isPreHoliday, effectiveMode, empId, dateStr, dept);
     const targetSeconds = shiftInfo.targetSeconds;
+    const targetOutSeconds = shiftInfo.targetOutSeconds || (targetSeconds + 32400);
     const targetStr = shiftInfo.targetStr;
     const isNightShift = shiftInfo.isNightShift;
+
+    const outH = Math.floor(targetOutSeconds / 3600) % 24;
+    const outM = Math.floor((targetOutSeconds % 3600) / 60);
+    const targetOutStr = `${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')}`;
 
     if (shiftInfo.normInSecs && shiftInfo.normInSecs !== clockInInfo.seconds && clockInInfo.seconds > 0) {
       clockInInfo.seconds = shiftInfo.normInSecs;
@@ -1154,10 +1161,17 @@ function recalculateAndRenderAll() {
       clockInInfo.str = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
     }
 
+    let normOutSecs = clockOutInfo.seconds;
+    if (clockOutInfo.seconds > 0 && isNightShift && clockOutInfo.seconds <= 25200) {
+      normOutSecs += 86400; // Next morning checkout for night shift
+    }
+
     if (isPreHoliday && clockInInfo.seconds > 0) totalPreHolidayShifts++;
 
     let isLate = false;
     let lateMinutes = 0;
+    let isEarlyOut = false;
+    let earlyOutMinutes = 0;
     let allowance = 0;
     let statusText = AppState.lang === 'en' ? 'Day Off / No Shift' : 'วันหยุด/ไม่เข้างาน';
     if (leaveReason && clockInInfo.seconds === 0 && actualHours === 0) {
@@ -1169,36 +1183,55 @@ function recalculateAndRenderAll() {
     else if (clockInInfo.seconds > 0 && clockOutInfo.seconds === 0) anomalyType = 'MISSING_OUT';
     else if (clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && !leaveReason && dayOfWeek !== 0 && dayOfWeek !== 6) anomalyType = 'ZERO_STAMP';
 
-    const isAprilWorkshop = dateStr.startsWith('2026-04') && dept.toLowerCase().includes('workshop');
+    const isWorkshop = dept.toLowerCase().includes('workshop');
+    const isClockIn1200 = clockInInfo.seconds === 43200 || clockInInfo.str.startsWith('12:00');
 
-    if (clockInInfo.seconds > 0 || actualHours > 0) {
-      const allowedCeiling = targetSeconds + AppState.lateToleranceSec;
-      if (!isAprilWorkshop && clockInInfo.seconds > allowedCeiling) {
-        isLate = true;
-        lateMinutes = Math.ceil((clockInInfo.seconds - targetSeconds) / 60);
-        allowance = 0;
-        statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m` : `❌ สาย ${lateMinutes} นาที`;
-        totalLateDays++;
-        if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
-      } else {
+    if (clockInInfo.seconds > 0 || actualHours > 0 || clockOutInfo.seconds > 0) {
+      if (isWorkshop && isClockIn1200) {
+        // ถ้าวันไหนที่เวลา clock in = 12:00:00 ไม่ต้องสนใจ
         isLate = false;
         lateMinutes = 0;
-        if (!isAprilWorkshop && (effectiveMode === 'dws' || effectiveMode === 'night') && actualHours < 8 && actualHours > 0) {
-          allowance = 0;
-          statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ 8 ชม.)';
-        } else if (leaveReason) {
-          allowance = 0;
-          statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. Leave)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว วันลา)';
-        } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-          allowance = 0; // อดค่าข้าว (วันหยุดเสาร์-อาทิตย์)
-          statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (ไม่ได้ค่าข้าว ส-อา)';
-        } else {
-          allowance = 25; // ได้ค่าข้าว 25 บาท!
-          statusText = AppState.lang === 'en' 
-            ? (isNightShift ? `✅ On Time (+25฿ ${targetStr})` : '✅ On Time (+25฿)') 
-            : (isNightShift ? `✅ ตรงเวลา (+25฿ กะ ${targetStr})` : '✅ ตรงเวลา (+25฿)');
-        }
+        isEarlyOut = false;
+        earlyOutMinutes = 0;
+        allowance = 0;
+        statusText = AppState.lang === 'en' ? '✅ On Time (Clock In 12:00)' : '✅ ไม่คิดสาย/ออกก่อน (เข้า 12:00)';
         totalOntimeDays++;
+      } else {
+        const allowedCeiling = isWorkshop ? targetSeconds : (targetSeconds + AppState.lateToleranceSec);
+        if (clockInInfo.seconds > allowedCeiling && clockInInfo.seconds > 0) {
+          isLate = true;
+          lateMinutes = Math.ceil((clockInInfo.seconds - targetSeconds) / 60);
+          allowance = 0;
+          statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m` : `❌ สาย ${lateMinutes} นาที`;
+          totalLateDays++;
+          if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
+        } else {
+          isLate = false;
+          lateMinutes = 0;
+          allowance = 0; // ตัดเรื่องการคิดค่าข้าวออกหมดทุกแผนก
+          if (leaveReason) {
+            statusText = AppState.lang === 'en' ? `🏖️ Leave (${leaveReason})` : `🏖️ ลา (${leaveReason})`;
+          } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+            statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (วันหยุด)';
+          } else {
+            statusText = AppState.lang === 'en' 
+              ? (isNightShift ? `✅ On Time (${targetStr})` : '✅ On Time') 
+              : (isNightShift ? `✅ ตรงเวลา (กะ ${targetStr})` : '✅ ตรงเวลา');
+          }
+          totalOntimeDays++;
+        }
+
+        if (normOutSecs > 0 && targetOutSeconds > 0 && normOutSecs < targetOutSeconds) {
+          isEarlyOut = true;
+          earlyOutMinutes = Math.ceil((targetOutSeconds - normOutSecs) / 60);
+          allowance = 0;
+          totalEarlyOutDays++;
+          if (statusText.includes('✅')) {
+            statusText = AppState.lang === 'en' ? `⚠️ Early Out (-${earlyOutMinutes}m)` : `⚠️ ออกก่อนเวลา (${earlyOutMinutes} นาที)`;
+          } else {
+            statusText += AppState.lang === 'en' ? ` / Early Out (${earlyOutMinutes}m)` : ` / ออกก่อน (${earlyOutMinutes} น.)`;
+          }
+        }
       }
     }
 
@@ -1210,11 +1243,14 @@ function recalculateAndRenderAll() {
       isOverridden = true;
       if (isLate && totalLateDays > 0) totalLateDays--;
       if (isLate) totalOntimeDays++;
+      if (isEarlyOut && totalEarlyOutDays > 0) totalEarlyOutDays--;
       
       isLate = false;
       lateMinutes = 0;
-      allowance = override.allowance !== undefined ? override.allowance : 25;
-      statusText = AppState.lang === 'en' ? `💡 Approved Override (+${allowance}฿)` : `💡 อนุมัติคืนสิทธิ์ (+${allowance}฿)`;
+      isEarlyOut = false;
+      earlyOutMinutes = 0;
+      allowance = 0;
+      statusText = AppState.lang === 'en' ? `💡 Approved Override (Time Adjusted)` : `💡 อนุมัติแก้ไขเวลาเรียบร้อยแล้ว`;
       if (override.correctedIn) clockInInfo.str = override.correctedIn;
       if (override.correctedOut) clockOutInfo.str = override.correctedOut;
     }
@@ -1231,6 +1267,7 @@ function recalculateAndRenderAll() {
       clockInStr: clockInInfo.str,
       clockInSeconds: clockInInfo.seconds,
       clockOutStr: clockOutInfo.str,
+      targetOutStr,
       targetTimeStr: shiftInfo.isMasterOverride 
         ? (AppState.lang === 'en' ? `${targetStr} (Master)` : `${targetStr} (ตารางกะ)`) 
         : ((AppState.empRuleMap && AppState.empRuleMap[empId]) || (AppState.deptRuleMap && AppState.deptRuleMap[dept]) ? `${targetStr} [${effectiveMode.toUpperCase()}]` : targetStr),
@@ -1244,6 +1281,8 @@ function recalculateAndRenderAll() {
       preHolidayReason: preHolidayReason || (isFriday ? (AppState.lang === 'en' ? 'Friday Shift (07:00)' : 'กะวันศุกร์ (เข้า 07:00)') : ''),
       isLate,
       lateMinutes,
+      isEarlyOut,
+      earlyOutMinutes,
       allowance,
       statusText,
       leaveReason,
@@ -1264,6 +1303,7 @@ function recalculateAndRenderAll() {
         totalDaysWorked: 0,
         ontimeDays: 0,
         lateDays: 0,
+        earlyOutDays: 0,
         preHolidayShifts: 0,
         totalAllowance: 0,
         totalActualHours: 0,
@@ -1277,6 +1317,7 @@ function recalculateAndRenderAll() {
       empMap[empId].totalDaysWorked++;
       if (isLate) empMap[empId].lateDays++;
       else empMap[empId].ontimeDays++;
+      if (isEarlyOut) empMap[empId].earlyOutDays = (empMap[empId].earlyOutDays || 0) + 1;
       if (isPreHoliday) empMap[empId].preHolidayShifts++;
       empMap[empId].totalAllowance += allowance;
       empMap[empId].totalActualHours += actualHours;
@@ -1296,8 +1337,14 @@ function recalculateAndRenderAll() {
   // Populate Department filter options
   const deptSelect = document.getElementById('summary-dept-filter');
   const dailyDeptSelect = document.getElementById('daily-dept-filter');
-  const currentDeptVal = deptSelect.value;
-  const currentDailyDeptVal = dailyDeptSelect ? dailyDeptSelect.value : 'all';
+  let currentDeptVal = deptSelect.value;
+  let currentDailyDeptVal = dailyDeptSelect ? dailyDeptSelect.value : 'all';
+  
+  // Default focus on Workshop if not yet selected by user
+  if (!deptSelect.dataset.userFiltered && deptsSet.has('Workshop')) {
+    currentDeptVal = 'Workshop';
+    if (dailyDeptSelect) currentDailyDeptVal = 'Workshop';
+  }
   
   deptSelect.innerHTML = `<option value="all">🏢 ทุกแผนก (All Departments)</option>`;
   if (dailyDeptSelect) {
@@ -1323,7 +1370,7 @@ function recalculateAndRenderAll() {
   document.getElementById('kpi-date-range').textContent = `${minDate} ถึง ${maxDate}`;
   document.getElementById('print-date-range').textContent = `${minDate} ถึง ${maxDate}`;
   
-  document.getElementById('kpi-total-allowance').innerHTML = `${totalAllowanceSum.toLocaleString()} <span class="kpi-unit">฿</span>`;
+  document.getElementById('kpi-total-allowance').innerHTML = `${totalEarlyOutDays.toLocaleString()} <span class="kpi-unit">ครั้ง</span>`;
   document.getElementById('kpi-ontime-days').textContent = totalOntimeDays.toLocaleString();
   
   document.getElementById('kpi-ontime-rate').innerHTML = `${ontimeRate}% <span class="kpi-unit">ตรงเวลา</span>`;
@@ -1381,7 +1428,7 @@ function renderSummaryTable() {
   }
 
   if (emps.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4">🔍 ไม่พบข้อมูลพนักงานที่ค้นหา</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" class="text-center py-4">🔍 ไม่พบข้อมูลพนักงานที่ค้นหา</td></tr>`;
     return;
   }
 
@@ -1395,13 +1442,14 @@ function renderSummaryTable() {
       <td class="text-center">${emp.totalDaysWorked}</td>
       <td class="text-center text-success font-semibold">${emp.ontimeDays}</td>
       <td class="text-center ${emp.lateDays > 0 ? 'text-danger font-bold' : 'text-muted'}">${emp.lateDays}</td>
+      <td class="text-center ${emp.earlyOutDays > 0 ? 'text-warning font-bold' : 'text-muted'}">${emp.earlyOutDays || 0}</td>
       <td class="text-center"><span class="badge badge-accent">${emp.preHolidayShifts}</span></td>
       <td class="text-left" style="font-size:0.8rem; line-height:1.2;">
         ${Object.keys(emp.leaveStats).length > 0 
           ? Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap;">- ${reason}: <b>${count}</b> วัน</div>`).join('') 
           : '<div class="text-center text-muted">-</div>'}
       </td>
-      <td class="text-right highlight-col">${emp.totalAllowance.toLocaleString()} ฿</td>
+      <td class="text-right highlight-col font-bold ${emp.earlyOutDays > 0 ? 'text-warning' : ''}">${emp.earlyOutDays || 0} ครั้ง</td>
       <td class="text-center">${emp.totalActualHours.toFixed(1)}</td>
       <td class="text-center">${emp.totalOTHours.toFixed(1)}</td>
       <td class="text-center">
@@ -1436,9 +1484,11 @@ function renderDailyTable() {
   }
 
   if (statusFilter === 'ontime') {
-    records = records.filter(r => (r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate);
+    records = records.filter(r => (r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate && !r.isEarlyOut);
   } else if (statusFilter === 'late') {
     records = records.filter(r => r.isLate);
+  } else if (statusFilter === 'early') {
+    records = records.filter(r => r.isEarlyOut);
   } else if (statusFilter === 'preholiday') {
     records = records.filter(r => r.isPreHoliday);
   } else if (statusFilter === 'ot') {
@@ -1469,18 +1519,20 @@ function renderDailyTable() {
   renderPaginationControls(totalPages);
 
   if (pageRecords.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" class="text-center py-4">🔍 ${AppState.lang === 'en' ? 'No attendance records match the filters' : 'ไม่พบรายการเข้า-ออกงานที่ตรงกับเงื่อนไข'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="text-center py-4">🔍 ${AppState.lang === 'en' ? 'No attendance records match the filters' : 'ไม่พบรายการเข้า-ออกงานที่ตรงกับเงื่อนไข'}</td></tr>`;
     return;
   }
 
   const html = pageRecords.map(r => {
     let statusClass = 'badge-secondary';
-    if (r.isLate) statusClass = 'badge-danger';
+    if (r.isLate || r.isEarlyOut) statusClass = 'badge-danger';
     else if (r.clockInSeconds > 0 || r.actualHours > 0) statusClass = 'badge-success';
 
     let allowanceHtml = `<span class="text-muted">-</span>`;
-    if (r.allowance === 25) allowanceHtml = `<strong class="text-success">+25 ฿</strong>`;
-    else if (r.isLate) allowanceHtml = `<span class="badge badge-danger">อดค่าข้าว 0฿</span>`;
+    if (r.isLate && r.isEarlyOut) allowanceHtml = `<span class="badge badge-danger">⚠️ สาย ${r.lateMinutes}น. + ออกก่อน ${r.earlyOutMinutes}น.</span>`;
+    else if (r.isLate) allowanceHtml = `<span class="badge badge-danger">❌ สาย ${r.lateMinutes} นาที</span>`;
+    else if (r.isEarlyOut) allowanceHtml = `<span class="badge badge-warning">⚠️ ออกก่อน ${r.earlyOutMinutes} นาที</span>`;
+    else if (r.clockInSeconds > 0 || r.actualHours > 0) allowanceHtml = `<span class="badge badge-success">✅ ตรงเวลา</span>`;
 
     return `
       <tr>
@@ -1495,7 +1547,8 @@ function renderDailyTable() {
         </td>
         <td class="font-mono font-bold ${r.isLate ? 'text-danger' : 'text-success'}">${r.clockInStr}</td>
         <td class="font-mono text-secondary">${r.targetTimeStr}</td>
-        <td class="font-mono">${r.clockOutStr}</td>
+        <td class="font-mono ${r.isEarlyOut ? 'text-danger font-bold' : ''}">${r.clockOutStr}</td>
+        <td class="font-mono text-secondary">${r.targetOutStr || '-'}</td>
         <td class="text-center">${r.actualHours.toFixed(1)}</td>
         <td class="text-center ${r.totalOT > 0 ? 'text-accent font-bold' : 'text-muted'}">${r.totalOT > 0 ? '+' + r.totalOT.toFixed(1) : '-'}</td>
         <td class="text-center">
@@ -1621,7 +1674,7 @@ function renderInsightsTab() {
         <td><strong>${e.empName}</strong> <span class="text-muted">(${e.empId})</span></td>
         <td class="text-center text-success font-semibold">${e.ontimeDays} ${dayUnit}</td>
         <td class="text-center"><span class="badge badge-success">${rate}%</span></td>
-        <td class="text-right font-bold text-accent">${e.totalAllowance.toLocaleString()} ฿</td>
+        <td class="text-right font-bold text-accent">${e.earlyOutDays || 0} ครั้ง</td>
       </tr>
     `;
   }).join('');
@@ -1638,7 +1691,7 @@ function renderInsightsTab() {
         <td><strong>${e.empName}</strong> <span class="text-muted">(${e.empId})</span></td>
         <td class="text-center text-danger font-bold">${e.lateDays} ${dayUnit}</td>
         <td class="text-center"><span class="badge badge-danger">${rate}%</span></td>
-        <td class="text-right font-bold text-danger">-${lostAllowance.toLocaleString()} ฿</td>
+        <td class="text-right font-bold text-warning">${e.earlyOutDays || 0} ครั้ง</td>
       </tr>
     `;
   }).join('') : `<tr><td colspan="5" class="text-center text-success py-3">${AppState.lang === 'en' ? '🎉 No employees were late in this period!' : '🎉 ไม่มีพนักงานมาสายในรอบข้อมูลนี้'}</td></tr>`;
@@ -2118,18 +2171,20 @@ function openEmployeeModal(empId, selectedMonth = 'ALL') {
   const tbody = document.getElementById('modal-tbody');
   tbody.innerHTML = sortedRecords.map(r => {
     let statusClass = 'badge-secondary';
-    if (r.isLate) statusClass = 'badge-danger';
+    if (r.isLate || r.isEarlyOut) statusClass = 'badge-danger';
     else if (r.clockInSeconds > 0 || r.actualHours > 0) statusClass = 'badge-success';
 
     let allowanceText = '-';
-    if (r.allowance === 25) allowanceText = `<strong class="text-success">+25 ฿</strong>`;
-    else if (r.isLate) allowanceText = `<span class="badge badge-danger">${AppState.lang === 'en' ? '0 ฿ (Late)' : '0 ฿ (สาย)'}</span>`;
+    if (r.isLate && r.isEarlyOut) allowanceText = `<span class="badge badge-danger">⚠️ สาย ${r.lateMinutes}น. + ออกก่อน ${r.earlyOutMinutes}น.</span>`;
+    else if (r.isLate) allowanceText = `<span class="badge badge-danger">❌ สาย ${r.lateMinutes} นาที</span>`;
+    else if (r.isEarlyOut) allowanceText = `<span class="badge badge-warning">⚠️ ออกก่อน ${r.earlyOutMinutes} นาที</span>`;
+    else if (r.clockInSeconds > 0 || r.actualHours > 0) allowanceText = `<span class="badge badge-success">✅ ตรงเวลา</span>`;
 
     let actionBtn = '';
     if (r.isOverridden) {
       actionBtn = `<button class="btn btn-xs btn-outline text-muted" onclick="removeOverride('${r.empId}', '${r.dateStr}')" title="ยกเลิกการแก้ไข">❌ ยกเลิก</button>`;
-    } else if (r.anomalyType || r.isLate) {
-      actionBtn = `<button class="btn btn-xs btn-success" onclick="quickApproveOverride('${r.empId}', '${r.dateStr}', '${r.anomalyType || 'LATE'}', 'อนุมัติจาก Employee Modal')" style="padding: 2px 6px; font-size: 0.7rem;">🟢 คืนสิทธิ์ +25฿</button>`;
+    } else if (r.anomalyType || r.isLate || r.isEarlyOut) {
+      actionBtn = `<button class="btn btn-xs btn-success" onclick="quickApproveOverride('${r.empId}', '${r.dateStr}', '${r.anomalyType || 'LATE/EARLY'}', 'อนุมัติจาก Employee Modal')" style="padding: 2px 6px; font-size: 0.7rem;">🟢 คืนสิทธิ์ +25฿</button>`;
     }
 
     return `
@@ -2142,7 +2197,7 @@ function openEmployeeModal(empId, selectedMonth = 'ALL') {
         </td>
         <td class="font-mono font-bold ${r.isLate ? 'text-danger' : 'text-success'}">${r.clockInStr}</td>
         <td class="font-mono text-secondary">${r.targetTimeStr}</td>
-        <td class="font-mono">${r.clockOutStr}</td>
+        <td class="font-mono ${r.isEarlyOut ? 'text-danger font-bold' : ''}">${r.clockOutStr}</td>
         <td class="text-center">${r.actualHours.toFixed(1)} / ${r.totalOT > 0 ? '+' + r.totalOT.toFixed(1) : '-'}</td>
         <td class="text-center">
           <span class="badge ${statusClass}">${r.statusText}</span>
@@ -2178,6 +2233,7 @@ function triggerPrintSummary() {
       <td class="text-center">${e.totalDaysWorked}</td>
       <td class="text-center">${e.ontimeDays}</td>
       <td class="text-center">${e.lateDays}</td>
+      <td class="text-center">${e.earlyOutDays || 0}</td>
       <td class="text-right font-bold">${e.totalAllowance.toLocaleString()} ฿</td>
       <td></td>
     </tr>

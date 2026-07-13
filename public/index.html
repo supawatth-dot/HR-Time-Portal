@@ -117,7 +117,7 @@
               </button>
               <button class="mode-btn" data-mode="night">
                 <span class="mode-title">🌙 โหมดกะบ่าย/กะดึก (Night & Auto Shift)</span>
-                <span class="mode-desc">รองรับ 4 กะเข้าบ่าย-ออกเช้าอีกวัน (15:00, 15:30, 16:00, 17:30)</span>
+                <span class="mode-desc">รองรับ 2 กะกลางคืน (15:30 ออก 00:30 และ 16:30 ออก 01:30)</span>
               </button>
             </div>
           </div>
@@ -165,10 +165,10 @@
       </div>
 
       <div class="kpi-card kpi-allowance highlight-card">
-        <div class="kpi-icon-wrap"><span class="kpi-icon">🍚</span></div>
+        <div class="kpi-icon-wrap"><span class="kpi-icon">⚠️</span></div>
         <div class="kpi-data">
-          <span class="kpi-label">ยอดเบิกค่าข้าวรวม (Total Allowance)</span>
-          <h2 class="kpi-value" id="kpi-total-allowance">0 <span class="kpi-unit">฿</span></h2>
+          <span class="kpi-label">สถิติออกก่อนเวลา (Total Early Out)</span>
+          <h2 class="kpi-value" id="kpi-total-allowance">0 <span class="kpi-unit">ครั้ง</span></h2>
           <span class="kpi-sub">จาก <span id="kpi-ontime-days">0</span> วันทำงานที่ตรงเวลา</span>
         </div>
       </div>
@@ -278,9 +278,10 @@
                 <th class="text-center">วันทำงานรวม</th>
                 <th class="text-center">ตรงเวลา (วัน)</th>
                 <th class="text-center">มาสาย (วัน)</th>
+                <th class="text-center">ออกก่อน (วัน)</th>
                 <th class="text-center">กะ 07:00 (ศ/ก่อนหยุด)</th>
                 <th class="text-center">สรุปการลา</th>
-                <th class="text-right highlight-col">ค่าข้าวยอดรวม (฿)</th>
+                <th class="text-right highlight-col">ออกก่อนเวลา (ครั้ง)</th>
                 <th class="text-center">ชม. ทำงานจริง</th>
                 <th class="text-center">ชม. OT</th>
                 <th class="text-center">จัดการ</th>
@@ -288,7 +289,7 @@
             </thead>
             <tbody id="summary-tbody">
               <tr>
-                <td colspan="12" class="text-center loading-cell">⏳ กำลังประมวลผลข้อมูล...</td>
+                <td colspan="13" class="text-center loading-cell">⏳ กำลังประมวลผลข้อมูล...</td>
               </tr>
             </tbody>
           </table>
@@ -319,6 +320,7 @@
               <option value="all">⚡ ทุกสถานะ (All Records)</option>
               <option value="ontime">✅ เฉพาะคนตรงเวลา (ได้ค่าข้าว +25฿)</option>
               <option value="late">❌ เฉพาะคนมาสาย (อดค่าข้าว 0฿)</option>
+              <option value="early">⚠️ เฉพาะคนออกก่อนเวลา (อดค่าข้าว 0฿)</option>
               <option value="preholiday">🌟 เฉพาะวันศุกร์และก่อนวันหยุด (เข้า 07:00)</option>
               <option value="ot">🔥 เฉพาะวันที่มีทำ OT</option>
             </select>
@@ -344,15 +346,16 @@
                 <th>เวลาเข้าจริง</th>
                 <th>เป้าหมายเข้า</th>
                 <th>เวลาออกจริง</th>
+                <th>เป้าหมายออก</th>
                 <th class="text-center">ชั่วโมง</th>
                 <th class="text-center">OT รวม</th>
-                <th class="text-center">สถานะสาย</th>
-                <th class="text-center highlight-col">ค่าข้าว</th>
+                <th class="text-center">สถานะ (เข้า/ออก)</th>
+                <th class="text-center highlight-col">สถิติสาย/ออกก่อน</th>
               </tr>
             </thead>
             <tbody id="daily-tbody">
               <tr>
-                <td colspan="13" class="text-center loading-cell">⏳ กำลังประมวลผลข้อมูล...</td>
+                <td colspan="14" class="text-center loading-cell">⏳ กำลังประมวลผลข้อมูล...</td>
               </tr>
             </tbody>
           </table>
@@ -448,7 +451,7 @@
                   <th>พนักงาน</th>
                   <th class="text-center">ตรงเวลา (วัน)</th>
                   <th class="text-center">อัตราตรงเวลา</th>
-                  <th class="text-right">ค่าข้าวสะสม</th>
+                  <th class="text-right">ออกก่อน (ครั้ง)</th>
                 </tr>
               </thead>
               <tbody id="top-ontime-tbody">
@@ -761,6 +764,7 @@
           <th class="text-center">วันทำงาน</th>
           <th class="text-center">ตรงเวลา (วัน)</th>
           <th class="text-center">มาสาย (วัน)</th>
+          <th class="text-center">ออกก่อน (วัน)</th>
           <th class="text-right">ยอดเบิกค่าข้าว (฿)</th>
           <th>ลายมือชื่อพนักงาน</th>
         </tr>

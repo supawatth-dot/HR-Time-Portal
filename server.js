@@ -90,27 +90,22 @@ function getMasterShifts() {
                     const empId = String(id).trim();
                     const sTime = String(inTime || '').trim();
                     
-                    let targetSeconds = 54000;
-                    let targetStr = '15:00 (N1)';
+                    let targetSeconds = 55800;
+                    let targetOutSeconds = 88200;
+                    let targetStr = '15:30 - 00:30';
                     let isNightShift = true;
 
-                    if (sTime === '03.30' || sTime === '15.30' || sTime === '15:30' || sTime === '3.30' || sTime === '3:30') {
-                      targetSeconds = 55800; targetStr = '15:30 (N2)'; isNightShift = true;
-                    } else if (sTime === '04.30' || sTime === '16.30' || sTime === '16:30' || sTime === '4.30' || sTime === '4:30') {
-                      targetSeconds = 59400; targetStr = '16:30 (N)'; isNightShift = true;
-                    } else if (sTime === '04.00' || sTime === '16.00' || sTime === '16:00' || sTime === '4.00' || sTime === '4:00') {
-                      targetSeconds = 57600; targetStr = '16:00 (N3)'; isNightShift = true;
-                    } else if (sTime === '03.00' || sTime === '15.00' || sTime === '15:00' || sTime === '3.00' || sTime === '3:00') {
-                      targetSeconds = 54000; targetStr = '15:00 (N1)'; isNightShift = true;
-                    } else if (sTime === '05.30' || sTime === '17.30' || sTime === '17:30' || sTime === '5.30' || sTime === '5:30') {
-                      targetSeconds = 63000; targetStr = '17:30 (N4)'; isNightShift = true;
+                    if (sTime === '03.30' || sTime === '15.30' || sTime === '15:30' || sTime === '3.30' || sTime === '3:30' || sTime === '03.00' || sTime === '15.00' || sTime === '15:00' || sTime === '3.00' || sTime === '3:00') {
+                      targetSeconds = 55800; targetOutSeconds = 88200; targetStr = '15:30 - 00:30'; isNightShift = true;
+                    } else if (sTime === '04.30' || sTime === '16.30' || sTime === '16:30' || sTime === '4.30' || sTime === '4:30' || sTime === '04.00' || sTime === '16.00' || sTime === '16:00' || sTime === '4.00' || sTime === '4:00' || sTime === '05.30' || sTime === '17.30' || sTime === '17:30' || sTime === '5.30' || sTime === '5:30') {
+                      targetSeconds = 59400; targetOutSeconds = 91800; targetStr = '16:30 - 01:30'; isNightShift = true;
                     } else if (sTime === '08.00' || sTime === '08:00' || sTime === '8.00' || sTime === '8:00') {
-                      targetSeconds = 28800; targetStr = '08:00'; isNightShift = false;
+                      targetSeconds = 28800; targetOutSeconds = 61200; targetStr = '08:00 - 17:00'; isNightShift = false;
                     } else if (sTime === '07.00' || sTime === '07:00' || sTime === '7.00' || sTime === '7:00') {
-                      targetSeconds = 25200; targetStr = '07:00'; isNightShift = false;
+                      targetSeconds = 25200; targetOutSeconds = 57600; targetStr = '07:00 - 16:00'; isNightShift = false;
                     }
 
-                    const masterData = { empId, date: dateStr, inTime: sTime, targetSeconds, targetStr, isNightShift, normInSecs: targetSeconds };
+                    const masterData = { empId, date: dateStr, inTime: sTime, targetSeconds, targetOutSeconds, targetStr, isNightShift, normInSecs: targetSeconds };
                     shiftMap[empId + '_' + dateStr] = masterData;
                     shiftMap[parseInt(empId, 10) + '_' + dateStr] = masterData;
                   }
