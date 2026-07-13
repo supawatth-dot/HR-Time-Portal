@@ -208,6 +208,11 @@
             <span class="tab-icon">📈</span>
             <span>4. วิเคราะห์สถิติ & อันดับความตรงเวลา</span>
           </button>
+          <button class="tab-btn" data-tab="tab-dispute">
+            <span class="tab-icon">⚡</span>
+            <span>5. จัดการรายการผิดปกติ & คืนสิทธิ์ (+25฿)</span>
+            <span class="tab-badge badge-danger" id="tab-dispute-count">0</span>
+          </button>
         </div>
         
         <div class="tabs-toolbar">
@@ -221,6 +226,7 @@
             <div class="dropdown-menu" id="export-menu">
               <a href="#" class="dropdown-item" id="export-summary-xlsx">📊 Export สรุปค่าข้าวรายบุคคล (.xlsx)</a>
               <a href="#" class="dropdown-item" id="export-daily-xlsx">📋 Export รายการเข้า-ออกรายวัน (.xlsx)</a>
+              <a href="#" class="dropdown-item" id="export-dispute-xlsx">⚡ Export รายการขอคืนสิทธิ์/ผิดปกติ (.xlsx)</a>
               <a href="#" class="dropdown-item" id="export-summary-csv">📄 Export สรุปรายบุคคล (.csv)</a>
             </div>
           </div>
@@ -471,6 +477,78 @@
         </div>
       </div>
 
+      <!-- TAB 5: EXCEPTION & DISPUTE CENTER -->
+      <div class="tab-content" id="tab-dispute">
+        <div class="dispute-banner" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(16, 185, 129, 0.1)); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 1.2rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main); font-size: 1.1rem;">
+              <span>🛡️ ศูนย์จัดการรายการผิดปกติและขอคืนสิทธิ์ค่าข้าว (In-Portal Override Engine)</span>
+            </h3>
+            <p style="margin: 0.3rem 0 0 0; color: var(--text-secondary); font-size: 0.85rem;">
+              ระบบดึงเฉพาะรายการที่พนักงานลืมแตะบัตร (Missing Stamp), เครื่องรูดขัดข้อง, หรือมาสาย มาไว้ที่เดียว โดยไม่ต้องไปค้นหาใน 15,000 แถว HR สามารถกด <strong>"🟢 อนุมัติ +25฿"</strong> ได้ในคลิกเดียว หรือระบุเวลาเข้า-ออกจริง ข้อมูลทั้งหมดจะถูกบันทึกและตรวจสอบย้อนหลังได้โดยไม่ต้องเปิดแก้ไฟล์ Excel ต้นฉบับ!
+            </p>
+          </div>
+          <div style="display: flex; gap: 1rem;">
+            <div style="background: var(--bg-card); padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">⚠️ รอดำเนินการ</span>
+              <strong style="font-size: 1.3rem; color: var(--danger-color);" id="dispute-kpi-pending">0</strong>
+            </div>
+            <div style="background: var(--bg-card); padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); text-align: center;">
+              <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">💡 อนุมัติคืนสิทธิ์แล้ว</span>
+              <strong style="font-size: 1.3rem; color: var(--success-color);" id="dispute-kpi-resolved">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-toolbar" style="margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; flex: 1;">
+            <div class="search-box" style="min-width: 240px;">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="dispute-search-input" placeholder="ค้นหารหัสพนักงาน, ชื่อ, วันที่..." oninput="filterDisputes()">
+            </div>
+            <select id="dispute-dept-filter" class="form-select" onchange="filterDisputes()" style="min-width: 180px;">
+              <option value="all">🏢 ทุกแผนก (All Departments)</option>
+            </select>
+            <select id="dispute-type-filter" class="form-select" onchange="filterDisputes()" style="min-width: 200px;">
+              <option value="all">⚡ ทุกประเภทความผิดปกติ (All)</option>
+              <option value="MISSING_IN">⚠️ ลืมสแกนเข้า (Missing In)</option>
+              <option value="MISSING_OUT">⚠️ ลืมสแกนออก (Missing Out)</option>
+              <option value="ZERO_STAMP">🔴 ไม่พบเวลาทั้งวัน (Zero Stamp)</option>
+              <option value="LATE">❌ มาสาย (Late)</option>
+              <option value="OVERRIDDEN">💡 อนุมัติคืนสิทธิ์แล้ว (Overridden)</option>
+            </select>
+          </div>
+          <div>
+            <button class="btn btn-success btn-sm" onclick="bulkApproveSelected()" style="font-weight: bold; padding: 0.5rem 1rem;">
+              🟢 อนุมัติ +25฿ รายการที่เลือกทั้งหมด (Bulk Approve)
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table" id="dispute-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;"><input type="checkbox" onclick="toggleSelectAllDisputes(this)" title="เลือกทั้งหมด"></th>
+                <th>วันที่</th>
+                <th>วัน</th>
+                <th>รหัส</th>
+                <th>ชื่อ-นามสกุล</th>
+                <th>แผนก</th>
+                <th>ประเภทความผิดปกติ</th>
+                <th class="text-center">เข้าจริง</th>
+                <th class="text-center">ออกจริง</th>
+                <th class="text-center">สิทธิ์ค่าข้าว</th>
+                <th class="text-center" style="min-width: 170px;">การจัดการ (Action)</th>
+              </tr>
+            </thead>
+            <tbody id="dispute-tbody">
+              <!-- Dynamic rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </section>
 
   </main>
@@ -517,6 +595,42 @@
       <div class="modal-footer">
         <button class="btn btn-secondary btn-sm" id="btn-export-emp-modal">📄 Export ประวัตินี้ (.xlsx)</button>
         <button class="btn btn-primary btn-sm" id="btn-close-modal-footer">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL TIME OVERRIDE MODAL -->
+  <div class="modal-backdrop" id="manual-time-modal">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <div>
+          <h3>✏️ ปรับแก้เวลาเข้า-ออกจริงโดย HR</h3>
+          <p class="modal-sub" id="manual-emp-info">-</p>
+        </div>
+        <button class="btn-close" onclick="closeManualTimeModal()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <input type="hidden" id="manual-emp-id">
+        <input type="hidden" id="manual-date-str">
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 0.4rem; color: var(--text-main);">🟢 เวลาเข้างานจริง (Clock-In Time)</label>
+          <input type="time" id="manual-in-time" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <label style="display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 0.4rem; color: var(--text-main);">🔴 เวลาออกงานจริง (Clock-Out Time)</label>
+          <input type="time" id="manual-out-time" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+        </div>
+        <div style="margin-bottom: 1.2rem;">
+          <label style="display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 0.4rem; color: var(--text-main);">📋 หมายเหตุ/เหตุผลในการปรับแก้</label>
+          <input type="text" id="manual-note" placeholder="เช่น เครื่องสแกนหน้าประตู B เสีย / ออกหน้างานฉุกเฉิน" class="form-control" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-main);">
+        </div>
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px dashed var(--success-color); border-radius: 8px; padding: 0.8rem; font-size: 0.8rem; color: var(--text-main);">
+          💡 <strong>หมายเหตุ:</strong> เมื่อบันทึกแล้ว ระบบจะคำนวณคืนสิทธิ์ค่าข้าว <strong>+25 บาท</strong> ให้อัตโนมัติ พร้อมบันทึกประวัติการปรับแก้นี้ลงในรายงาน Export
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.8rem;">
+        <button class="btn btn-secondary btn-sm" onclick="closeManualTimeModal()">ยกเลิก</button>
+        <button class="btn btn-success btn-sm" onclick="saveManualTimeOverride()" style="font-weight: bold;">💾 บันทึกและคืนสิทธิ์ +25฿</button>
       </div>
     </div>
   </div>

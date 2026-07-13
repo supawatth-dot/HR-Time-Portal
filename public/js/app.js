@@ -17,7 +17,9 @@ const AppState = {
   dailyPerPage: 100,
   selectedEmployeeForModal: null,
   currentFileName: 'Clock in and out_01.01.26 to 30.06.26.xlsx',
-  lang: localStorage.getItem('hr_time_lang') || 'th'
+  lang: localStorage.getItem('hr_time_lang') || 'th',
+  overrides: JSON.parse(localStorage.getItem('hr_time_overrides_v1') || '{}'),
+  disputeFilter: { dept: '', type: '', search: '' }
 };
 
 // Day Names
@@ -58,6 +60,8 @@ function setupEventListeners() {
       
       if (targetTab === 'tab-insights') {
         renderInsightsTab();
+      } else if (targetTab === 'tab-dispute') {
+        renderDisputeTab();
       }
     });
   });
@@ -245,6 +249,13 @@ function setupEventListeners() {
     e.preventDefault();
     exportDailyXLSX();
   });
+  const exportDisputeEl = document.getElementById('export-dispute-xlsx');
+  if (exportDisputeEl) {
+    exportDisputeEl.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportDisputeXLSX();
+    });
+  }
   document.getElementById('export-summary-csv').addEventListener('click', (e) => {
     e.preventDefault();
     exportSummaryCSV();
@@ -821,6 +832,16 @@ function recalculateAndRenderAll() {
       statusText = AppState.lang === 'en' ? 'Leave / Absence' : 'ลาหยุด';
     }
 
+    // Detect Anomaly Types (Missing In, Missing Out, Zero Stamp on Workday, Emergency Late)
+    let anomalyType = null;
+    if (clockInInfo.seconds === 0 && clockOutInfo.seconds > 0) {
+      anomalyType = 'MISSING_IN';
+    } else if (clockInInfo.seconds > 0 && clockOutInfo.seconds === 0) {
+      anomalyType = 'MISSING_OUT';
+    } else if (clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && !leaveReason && dayOfWeek !== 0 && dayOfWeek !== 6) {
+      anomalyType = 'ZERO_STAMP';
+    }
+
     if (clockInInfo.seconds > 0 || actualHours > 0) {
       const allowedCeiling = targetSeconds + AppState.lateToleranceSec;
       
@@ -830,6 +851,7 @@ function recalculateAndRenderAll() {
         allowance = 0; // อดค่าข้าว 25 บาท!
         statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m` : `❌ สาย ${lateMinutes} นาที`;
         totalLateDays++;
+        if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
       } else {
         isLate = false;
         lateMinutes = 0;
@@ -849,6 +871,23 @@ function recalculateAndRenderAll() {
         }
         totalOntimeDays++;
       }
+    }
+
+    // Check for In-Portal Override
+    const overrideKey = `${empId}_${dateStr}`;
+    const override = AppState.overrides[overrideKey];
+    let isOverridden = false;
+    if (override && override.status === 'APPROVED') {
+      isOverridden = true;
+      if (isLate && totalLateDays > 0) totalLateDays--;
+      if (isLate) totalOntimeDays++;
+      
+      isLate = false;
+      lateMinutes = 0;
+      allowance = override.allowance !== undefined ? override.allowance : 25;
+      statusText = AppState.lang === 'en' ? `💡 Approved Override (+${allowance}฿)` : `💡 อนุมัติคืนสิทธิ์ (+${allowance}฿)`;
+      if (override.correctedIn) clockInInfo.str = override.correctedIn;
+      if (override.correctedOut) clockOutInfo.str = override.correctedOut;
     }
 
     const record = {
@@ -875,7 +914,10 @@ function recalculateAndRenderAll() {
       allowance,
       statusText,
       leaveReason,
-      dept
+      dept,
+      anomalyType,
+      isOverridden,
+      overrideInfo: override || null
     };
 
     processed.push(record);
@@ -960,9 +1002,16 @@ function recalculateAndRenderAll() {
   document.getElementById('tab-emp-count').textContent = totalEmps;
   document.getElementById('tab-daily-count').textContent = processed.length > 999 ? (processed.length / 1000).toFixed(1) + 'k' : processed.length;
 
+  const totalAnomalies = processed.filter(r => r.anomalyType && !r.isOverridden).length;
+  const disputeBadge = document.getElementById('tab-dispute-count');
+  if (disputeBadge) disputeBadge.textContent = totalAnomalies.toLocaleString();
+
   // Render current tab tables
   renderSummaryTable();
   renderDailyTable();
+  if (typeof renderDisputeTab === 'function') {
+    renderDisputeTab();
+  }
   if (AppState.currentTab === 'tab-insights') {
     renderInsightsTab();
   }
@@ -1298,6 +1347,252 @@ function renderInsightsTab() {
 }
 
 /**
+ * Render Exception & Dispute Center (Tab ⚡)
+ */
+function renderDisputeTab() {
+  const tbody = document.getElementById('dispute-tbody');
+  if (!tbody) return;
+
+  const deptFilter = AppState.disputeFilter.dept;
+  const typeFilter = AppState.disputeFilter.type;
+  const search = AppState.disputeFilter.search;
+
+  // Find all records that have anomalies OR overrides
+  let records = AppState.processedRecords.filter(r => r.anomalyType || r.isOverridden || r.isLate);
+
+  if (deptFilter && deptFilter !== 'all') {
+    records = records.filter(r => r.dept === deptFilter);
+  }
+  if (typeFilter && typeFilter !== 'all') {
+    if (typeFilter === 'OVERRIDDEN') {
+      records = records.filter(r => r.isOverridden);
+    } else if (typeFilter === 'MISSING_IN') {
+      records = records.filter(r => r.anomalyType === 'MISSING_IN' && !r.isOverridden);
+    } else if (typeFilter === 'MISSING_OUT') {
+      records = records.filter(r => r.anomalyType === 'MISSING_OUT' && !r.isOverridden);
+    } else if (typeFilter === 'ZERO_STAMP') {
+      records = records.filter(r => r.anomalyType === 'ZERO_STAMP' && !r.isOverridden);
+    } else if (typeFilter === 'LATE') {
+      records = records.filter(r => r.isLate && !r.isOverridden);
+    }
+  }
+  if (search) {
+    records = records.filter(r => 
+      r.empId.toLowerCase().includes(search) || 
+      r.empName.toLowerCase().includes(search) || 
+      r.dateStr.includes(search)
+    );
+  }
+
+  // Populate Department options if not populated
+  const disputeDeptSelect = document.getElementById('dispute-dept-filter');
+  if (disputeDeptSelect && disputeDeptSelect.options.length <= 1) {
+    const depts = new Set(AppState.processedRecords.map(r => r.dept));
+    disputeDeptSelect.innerHTML = `<option value="all">🏢 ทุกแผนก (All Departments)</option>`;
+    [...depts].sort().forEach(d => {
+      disputeDeptSelect.innerHTML += `<option value="${d}" ${d === deptFilter ? 'selected' : ''}>${d}</option>`;
+    });
+  }
+
+  // Update KPI counters on Dispute Tab
+  const pendingCount = AppState.processedRecords.filter(r => (r.anomalyType || r.isLate) && !r.isOverridden).length;
+  const resolvedCount = AppState.processedRecords.filter(r => r.isOverridden).length;
+  const badgePending = document.getElementById('dispute-kpi-pending');
+  const badgeResolved = document.getElementById('dispute-kpi-resolved');
+  if (badgePending) badgePending.textContent = pendingCount.toLocaleString();
+  if (badgeResolved) badgeResolved.textContent = resolvedCount.toLocaleString();
+
+  if (records.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center py-4">✅ ไม่พบรายการผิดปกติหรือรายการที่ตรงกับตัวกรอง</td></tr>`;
+    return;
+  }
+
+  // Limit to 200 items for snappy rendering if too many
+  const displayRecords = records.slice(0, 200);
+
+  tbody.innerHTML = displayRecords.map(r => {
+    let typeBadge = '';
+    if (r.isOverridden) {
+      typeBadge = `<span class="badge badge-success">💡 อนุมัติแล้ว (${r.overrideInfo.note || 'HR Approved'})</span>`;
+    } else if (r.anomalyType === 'MISSING_IN') {
+      typeBadge = `<span class="badge badge-warning">⚠️ ลืมสแกนเข้า (Missing In)</span>`;
+    } else if (r.anomalyType === 'MISSING_OUT') {
+      typeBadge = `<span class="badge badge-warning">⚠️ ลืมสแกนออก (Missing Out)</span>`;
+    } else if (r.anomalyType === 'ZERO_STAMP') {
+      typeBadge = `<span class="badge badge-danger">🔴 ไม่พบเวลาทั้งวัน (Zero Stamp)</span>`;
+    } else if (r.isLate) {
+      typeBadge = `<span class="badge badge-danger">❌ สาย ${r.lateMinutes} นาที</span>`;
+    }
+
+    let actions = '';
+    if (r.isOverridden) {
+      actions = `
+        <button class="btn btn-xs btn-outline text-muted" onclick="removeOverride('${r.empId}', '${r.dateStr}')" title="ยกเลิกสิทธิ์">❌ ยกเลิก</button>
+        <button class="btn btn-xs btn-outline" onclick="openManualTimeModal('${r.empId}', '${r.dateStr}', '${r.clockInStr}', '${r.clockOutStr}', '${r.empName}')">✏️ แก้เวลา</button>
+      `;
+    } else {
+      actions = `
+        <button class="btn btn-xs btn-success" onclick="quickApproveOverride('${r.empId}', '${r.dateStr}', '${r.anomalyType || 'LATE'}', 'อนุมัติผ่านปุ่ม 1-Click')" style="padding: 3px 8px; font-weight:bold;">🟢 อนุมัติ +25฿</button>
+        <button class="btn btn-xs btn-secondary" onclick="openManualTimeModal('${r.empId}', '${r.dateStr}', '${r.clockInStr}', '${r.clockOutStr}', '${r.empName}')" style="padding: 3px 8px;">✏️ ระบุเวลา</button>
+      `;
+    }
+
+    return `
+      <tr class="${r.isOverridden ? 'bg-success-light' : ''}">
+        <td><input type="checkbox" class="dispute-chk" data-emp="${r.empId}" data-date="${r.dateStr}" ${r.isOverridden ? 'disabled checked' : ''}></td>
+        <td><strong>${r.dateStr}</strong></td>
+        <td><span class="badge badge-secondary">${r.dayNameShort}</span></td>
+        <td><strong>${r.empId}</strong></td>
+        <td>${r.empName}</td>
+        <td><span class="badge badge-secondary">${r.dept}</span></td>
+        <td>${typeBadge}</td>
+        <td class="font-mono text-center">${r.clockInStr}</td>
+        <td class="font-mono text-center">${r.clockOutStr}</td>
+        <td class="text-center font-bold ${r.allowance === 25 ? 'text-success' : 'text-danger'}">${r.allowance === 25 ? '+25 ฿' : '0 ฿'}</td>
+        <td class="text-center" style="white-space:nowrap;">${actions}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterDisputes() {
+  const deptEl = document.getElementById('dispute-dept-filter');
+  const typeEl = document.getElementById('dispute-type-filter');
+  const searchEl = document.getElementById('dispute-search-input');
+  if (deptEl) AppState.disputeFilter.dept = deptEl.value;
+  if (typeEl) AppState.disputeFilter.type = typeEl.value;
+  if (searchEl) AppState.disputeFilter.search = searchEl.value.trim().toLowerCase();
+  renderDisputeTab();
+}
+
+function quickApproveOverride(empId, dateStr, anomalyType, note = 'อนุมัติสิทธิ์ค่าข้าวโดย HR') {
+  const overrideKey = `${empId}_${dateStr}`;
+  AppState.overrides[overrideKey] = {
+    status: 'APPROVED',
+    type: anomalyType,
+    allowance: 25,
+    note: note,
+    timestamp: new Date().toISOString()
+  };
+  localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  recalculateAndRenderAll();
+  
+  // If modal is open for this employee, refresh modal view
+  if (AppState.selectedEmployeeForModal && AppState.selectedEmployeeForModal.empId === empId) {
+    const updatedEmp = AppState.employeeSummary[empId];
+    if (updatedEmp) openEmployeeModal(updatedEmp);
+  }
+}
+
+function removeOverride(empId, dateStr) {
+  const overrideKey = `${empId}_${dateStr}`;
+  delete AppState.overrides[overrideKey];
+  localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  recalculateAndRenderAll();
+  
+  if (AppState.selectedEmployeeForModal && AppState.selectedEmployeeForModal.empId === empId) {
+    const updatedEmp = AppState.employeeSummary[empId];
+    if (updatedEmp) openEmployeeModal(updatedEmp);
+  }
+}
+
+function openManualTimeModal(empId, dateStr, currentIn, currentOut, empName) {
+  let modal = document.getElementById('manual-time-modal');
+  if (!modal) return;
+  document.getElementById('manual-emp-info').textContent = `${empName} (รหัส: ${empId}) - วันที่: ${dateStr}`;
+  document.getElementById('manual-emp-id').value = empId;
+  document.getElementById('manual-date-str').value = dateStr;
+  document.getElementById('manual-in-time').value = (currentIn === '-' || !currentIn) ? '08:00' : currentIn;
+  document.getElementById('manual-out-time').value = (currentOut === '-' || !currentOut) ? '17:00' : currentOut;
+  document.getElementById('manual-note').value = '';
+  modal.classList.add('open');
+}
+
+function closeManualTimeModal() {
+  const modal = document.getElementById('manual-time-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function saveManualTimeOverride() {
+  const empId = document.getElementById('manual-emp-id').value;
+  const dateStr = document.getElementById('manual-date-str').value;
+  const customIn = document.getElementById('manual-in-time').value.trim();
+  const customOut = document.getElementById('manual-out-time').value.trim();
+  const note = document.getElementById('manual-note').value.trim() || 'ปรับเวลาเข้า-ออกจริงโดย HR';
+
+  if (!empId || !dateStr) return;
+
+  const overrideKey = `${empId}_${dateStr}`;
+  AppState.overrides[overrideKey] = {
+    status: 'APPROVED',
+    type: 'MANUAL_TIME',
+    correctedIn: customIn,
+    correctedOut: customOut,
+    allowance: 25,
+    note: note,
+    timestamp: new Date().toISOString()
+  };
+  localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  closeManualTimeModal();
+  recalculateAndRenderAll();
+}
+
+function bulkApproveSelected() {
+  const checkboxes = document.querySelectorAll('.dispute-chk:checked:not([disabled])');
+  if (checkboxes.length === 0) {
+    alert('กรุณาเลือกรายการที่ต้องการอนุมัติอย่างน้อย 1 รายการครับ');
+    return;
+  }
+  checkboxes.forEach(chk => {
+    const empId = chk.getAttribute('data-emp');
+    const dateStr = chk.getAttribute('data-date');
+    if (empId && dateStr) {
+      AppState.overrides[`${empId}_${dateStr}`] = {
+        status: 'APPROVED',
+        type: 'BULK_APPROVED',
+        allowance: 25,
+        note: 'อนุมัติหมู่แบบกลุ่ม (Bulk Approved)',
+        timestamp: new Date().toISOString()
+      };
+    }
+  });
+  localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  recalculateAndRenderAll();
+  alert(`✅ อนุมัติคืนสิทธิ์เรียบร้อยแล้วจำนวน ${checkboxes.length} รายการครับ!`);
+}
+
+function toggleSelectAllDisputes(sourceChk) {
+  const checkboxes = document.querySelectorAll('.dispute-chk:not([disabled])');
+  checkboxes.forEach(chk => chk.checked = sourceChk.checked);
+}
+
+/**
+ * Export Exception & Dispute List to Excel
+ */
+function exportDisputeXLSX() {
+  const records = AppState.processedRecords.filter(r => r.anomalyType || r.isOverridden || r.isLate).map(r => ({
+    'วันที่ (Date)': r.dateStr,
+    'รหัสพนักงาน (ID)': r.empId,
+    'ชื่อ-นามสกุล (Name)': r.empName,
+    'แผนก (Dept)': r.dept,
+    'ประเภทความผิดปกติ (Anomaly Type)': r.anomalyType || (r.isLate ? 'LATE' : 'NORMAL'),
+    'เวลาเข้า (Clock In)': r.clockInStr,
+    'เวลาออก (Clock Out)': r.clockOutStr,
+    'สถานะการอนุมัติ (Status)': r.isOverridden ? 'อนุมัติคืนสิทธิ์ +25฿' : 'ยังไม่อนุมัติ (0฿)',
+    'หมายเหตุการแก้ไข (Note)': r.isOverridden && r.overrideInfo ? r.overrideInfo.note : '-'
+  }));
+
+  if (records.length === 0) {
+    alert('ไม่พบรายการสำหรับส่งออก');
+    return;
+  }
+  const worksheet = XLSX.utils.json_to_sheet(records);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Exception Disputes');
+  XLSX.writeFile(workbook, `HR_Workshop_Exceptions_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+/**
  * Open Employee Detailed Daily Modal
  */
 function openEmployeeModal(empId) {
@@ -1336,6 +1631,13 @@ function openEmployeeModal(empId) {
     if (r.allowance === 25) allowanceText = `<strong class="text-success">+25 ฿</strong>`;
     else if (r.isLate) allowanceText = `<span class="badge badge-danger">${AppState.lang === 'en' ? '0 ฿ (Late)' : '0 ฿ (สาย)'}</span>`;
 
+    let actionBtn = '';
+    if (r.isOverridden) {
+      actionBtn = `<button class="btn btn-xs btn-outline text-muted" onclick="removeOverride('${r.empId}', '${r.dateStr}')" title="ยกเลิกการแก้ไข">❌ ยกเลิก</button>`;
+    } else if (r.anomalyType || r.isLate) {
+      actionBtn = `<button class="btn btn-xs btn-success" onclick="quickApproveOverride('${r.empId}', '${r.dateStr}', '${r.anomalyType || 'LATE'}', 'อนุมัติจาก Employee Modal')" style="padding: 2px 6px; font-size: 0.7rem;">🟢 คืนสิทธิ์ +25฿</button>`;
+    }
+
     return `
       <tr>
         <td><strong>${r.dateStr}</strong></td>
@@ -1351,6 +1653,7 @@ function openEmployeeModal(empId) {
         <td class="text-center">
           <span class="badge ${statusClass}">${r.statusText}</span>
           ${r.leaveReason ? `<br><span class="badge badge-warning mt-1" style="font-size:0.75rem; white-space:normal;">🛌 ${r.leaveReason}</span>` : ''}
+          ${actionBtn ? `<div class="mt-1">${actionBtn}</div>` : ''}
         </td>
         <td class="text-right highlight-col">${allowanceText}</td>
       </tr>
@@ -1490,3 +1793,13 @@ function exportEmployeeModalXLSX(emp) {
 window.openEmployeeModal = openEmployeeModal;
 window.deleteHoliday = deleteHoliday;
 window.goToDailyPage = goToDailyPage;
+window.renderDisputeTab = renderDisputeTab;
+window.filterDisputes = filterDisputes;
+window.quickApproveOverride = quickApproveOverride;
+window.removeOverride = removeOverride;
+window.openManualTimeModal = openManualTimeModal;
+window.closeManualTimeModal = closeManualTimeModal;
+window.saveManualTimeOverride = saveManualTimeOverride;
+window.bulkApproveSelected = bulkApproveSelected;
+window.toggleSelectAllDisputes = toggleSelectAllDisputes;
+window.exportDisputeXLSX = exportDisputeXLSX;
