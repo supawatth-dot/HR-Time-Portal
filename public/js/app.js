@@ -1675,6 +1675,113 @@ function openEmployeeModal(empId, selectedMonth = 'ALL') {
     leaveEl.textContent = '-';
   }
 
+  // --- KPI & BEHAVIORAL ANALYTICS COMPUTATION ---
+  const kpiEl = document.getElementById('modal-kpi-insights');
+  if (kpiEl) {
+    const workDaysCount = ontimeDays + lateDays;
+    const punctualityScore = workDaysCount > 0 ? ((ontimeDays / workDaysCount) * 100).toFixed(1) : '100.0';
+    
+    let gradeText = 'A+ 🏆 (ยอดเยี่ยมพิเศษ - โบนัสขยัน)';
+    let gradeBadgeClass = 'badge-success';
+    let gradeColor = 'var(--success)';
+    if (parseFloat(punctualityScore) < 90) {
+      gradeText = 'C/D ⚠️ (ต้องตักเตือน/ปรับปรุงพฤติกรรม)';
+      gradeBadgeClass = 'badge-danger';
+      gradeColor = 'var(--danger)';
+    } else if (parseFloat(punctualityScore) < 95) {
+      gradeText = 'B 👍 (ปานกลาง - ผ่านมาตรฐานบริษัท)';
+      gradeBadgeClass = 'badge-secondary';
+      gradeColor = 'var(--accent)';
+    } else if (parseFloat(punctualityScore) < 98) {
+      gradeText = 'A 🌟 (ดีมาก - ตรงเวลาตามมาตรฐาน KPI)';
+      gradeBadgeClass = 'badge-success';
+      gradeColor = 'var(--success)';
+    }
+
+    // Lateness day pattern analysis
+    const lateDaysMap = {};
+    let maxLateDayName = '-';
+    let maxLateDayCount = 0;
+    filteredRecords.forEach(r => {
+      if (r.isLate && r.dayNameFull) {
+        lateDaysMap[r.dayNameFull] = (lateDaysMap[r.dayNameFull] || 0) + 1;
+        if (lateDaysMap[r.dayNameFull] > maxLateDayCount) {
+          maxLateDayCount = lateDaysMap[r.dayNameFull];
+          maxLateDayName = r.dayNameFull;
+        }
+      }
+    });
+
+    let latePatternSummary = '✅ ไม่พบสถิติการเข้างานสายเลยในตอนที่เลือก';
+    let latePatternDetail = 'ความเสี่ยง KPI มาสาย: 0% (พฤติกรรมสม่ำเสมอดีมาก)';
+    if (lateDays > 0 && maxLateDayCount > 0) {
+      const pct = Math.round((maxLateDayCount / lateDays) * 100);
+      latePatternSummary = `⚠️ มาสายบ่อยที่สุดใน "วัน${maxLateDayName}"`;
+      latePatternDetail = `พบการมาสายวัน${maxLateDayName}ถึง ${maxLateDayCount} ครั้ง (ร้อยละ ${pct}% ของวันที่สายทั้งหมด)`;
+    }
+
+    // Average clock-in time and early delta
+    const validInSecs = filteredRecords
+      .filter(r => r.clockInSeconds > 0 && r.clockInSeconds < 43200) // Before noon clock-in
+      .map(r => r.clockInSeconds);
+    
+    let avgClockInStr = '-';
+    let earlyDeltaText = '';
+    if (validInSecs.length > 0) {
+      const avgSec = Math.round(validInSecs.reduce((a, b) => a + b, 0) / validInSecs.length);
+      const h = Math.floor(avgSec / 3600);
+      const m = Math.floor((avgSec % 3600) / 60);
+      avgClockInStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} น.`;
+      const targetSec = 28800; // 08:00
+      if (avgSec < targetSec) {
+        earlyDeltaText = `(มาก่อนเวลาเฉลี่ย ${Math.round((targetSec - avgSec)/60)} นาที)`;
+      } else if (avgSec > targetSec) {
+        earlyDeltaText = `(ช้ากว่าเวลาเฉลี่ย ${Math.round((avgSec - targetSec)/60)} นาที)`;
+      }
+    }
+
+    // Max On-Time Streak
+    const sortedAsc = [...filteredRecords].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+    let currentStreak = 0;
+    let maxStreak = 0;
+    sortedAsc.forEach(r => {
+      if ((r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate) {
+        currentStreak++;
+        if (currentStreak > maxStreak) maxStreak = currentStreak;
+      } else if (r.isLate || (r.clockInSeconds > 0 && r.isLate)) {
+        currentStreak = 0;
+      }
+    });
+
+    kpiEl.innerHTML = `
+      <div style="margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.6rem; flex-wrap: wrap; gap: 0.5rem;">
+        <span style="font-size: 0.95rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+          💡 บทวิเคราะห์พฤติกรรมการเข้างาน & ข้อมูลประเมิน KPI (Attendance Analytics Insights)
+        </span>
+        <span class="badge ${gradeBadgeClass}" style="font-size: 0.85rem; padding: 0.35rem 0.85rem; border-radius: 50px;">
+          เกรดประเมิน KPI: ${gradeText}
+        </span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.85rem;">
+        <div style="background: rgba(0,0,0,0.22); padding: 0.85rem; border-radius: var(--radius-sm); border-left: 4px solid var(--primary);">
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.25rem;">🏆 คะแนนความตรงเวลา (Punctuality Score)</div>
+          <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.25rem;">${punctualityScore}% <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-secondary);">(${ontimeDays} / ${workDaysCount || 1} วัน)</span></div>
+          <div style="font-size: 0.75rem; color: ${gradeColor}; font-weight: 600;">เกณฑ์ประเมิน: ${gradeText.split(' ')[0]}</div>
+        </div>
+        <div style="background: rgba(0,0,0,0.22); padding: 0.85rem; border-radius: var(--radius-sm); border-left: 4px solid ${lateDays > 0 ? '#ef4444' : '#10b981'};">
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.25rem;">⚠️ รูปแบบการมาสาย (Lateness Pattern Analysis)</div>
+          <div style="font-size: 1.0rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">${latePatternSummary}</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">${latePatternDetail}</div>
+        </div>
+        <div style="background: rgba(0,0,0,0.22); padding: 0.85rem; border-radius: var(--radius-sm); border-left: 4px solid #3b82f6;">
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 0.25rem;">⏱️ เวลาเข้างานเฉลี่ย (Average Clock-in)</div>
+          <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 0.25rem;">${avgClockInStr} <span style="font-size:0.75rem; font-weight:normal; color:var(--success);">${earlyDeltaText}</span></div>
+          <div style="font-size: 0.75rem; color: #3b82f6;">🔥 สถิติตรงเวลาต่อเนื่อง: <strong>${maxStreak} วันทำการติดกัน</strong></div>
+        </div>
+      </div>
+    `;
+  }
+
   // Sort employee records by date descending
   const sortedRecords = [...filteredRecords].sort((a, b) => b.dateStr.localeCompare(a.dateStr));
 
