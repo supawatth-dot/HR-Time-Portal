@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚡ HR-Time Portal — เอกสารวิเคราะห์โปรเจค</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0f172a;
+    --bg2:       #1e293b;
+    --bg3:       #273549;
+    --border:    #334155;
+    --text:      #e2e8f0;
+    --text2:     #94a3b8;
+    --blue:      #38bdf8;
+    --blue2:     #0ea5e9;
+    --blue-dark: #1e3a5f;
+    --green:     #34d399;
+    --orange:    #fb923c;
+    --red:       #f87171;
+    --purple:    #a78bfa;
+    --white:     #f8fafc;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans Thai', 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── Ambient background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(56,189,248,.07) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 90%, rgba(167,139,250,.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ── */
+  .page { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ── Cover ── */
+  .cover {
+    text-align: center;
+    padding: 80px 20px 60px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 56px;
+  }
+  .cover-badge {
+    display: inline-block;
+    background: rgba(56,189,248,.12);
+    border: 1px solid rgba(56,189,248,.3);
+    color: var(--blue);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  .cover h1 {
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  .cover h1 span { color: var(--blue); }
+  .cover .sub {
+    font-size: 16px;
+    color: var(--text2);
+    margin-bottom: 28px;
+  }
+  .cover-meta {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .meta-pill {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 13px;
+    color: var(--text2);
+  }
+  .meta-pill strong { color: var(--text); }
+  .live-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 22px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: opacity .2s;
+  }
+  .live-link:hover { opacity: .85; }
+
+  /* ── Section headings ── */
+  .section { margin-bottom: 56px; }
+  h2.sec-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--white);
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--blue2);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2.sec-title .num {
+    background: var(--blue2);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  h3.sub-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--blue);
+    margin: 24px 0 10px;
+  }
+  p.desc { color: var(--text2); margin-bottom: 14px; }
+
+  /* ── Stats grid ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--blue2), var(--blue));
+  }
+  .stat-card.green::before  { background: linear-gradient(90deg, #059669, #34d399); }
+  .stat-card.red::before    { background: linear-gradient(90deg, #dc2626, #f87171); }
+  .stat-card.orange::before { background: linear-gradient(90deg, #d97706, #fb923c); }
+  .stat-card.purple::before { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+  .stat-icon { font-size: 26px; margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 700; color: var(--white); line-height: 1.1; }
+  .stat-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .stat-sub   { font-size: 11px; color: var(--border); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Tables ── */
+  .tbl-wrap { overflow-x: auto; margin: 16px 0; border-radius: 10px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--blue-dark); }
+  thead th { padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 600; color: var(--blue); white-space: nowrap; }
+  tbody tr:nth-child(odd)  { background: var(--bg2); }
+  tbody tr:nth-child(even) { background: var(--bg); }
+  tbody tr:hover { background: var(--bg3); }
+  tbody td { padding: 10px 16px; font-size: 13.5px; color: var(--text2); border-top: 1px solid rgba(51,65,85,.5); }
+  tbody td:first-child { color: var(--text); font-weight: 500; }
+  code.mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: rgba(56,189,248,.1);
+    color: var(--blue);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* ── Badge chips ── */
+  .chip {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+  }
+  .chip-blue   { background: rgba(56,189,248,.15); color: var(--blue); }
+  .chip-green  { background: rgba(52,211,153,.15); color: var(--green); }
+  .chip-orange { background: rgba(251,146,60,.15);  color: var(--orange); }
+
+  /* ── Rule cards ── */
+  .rule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+  @media (max-width: 600px) { .rule-grid { grid-template-columns: 1fr; } }
+  .rule-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .rule-card h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--white);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rule-card ul { padding-left: 18px; }
+  .rule-card li { font-size: 13px; color: var(--text2); margin-bottom: 5px; }
+  .rule-card li strong { color: var(--text); }
+
+  /* ── Tech badges ── */
+  .tech-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 20px; }
+  .tech-badge {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .tech-badge .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot-blue   { background: var(--blue); }
+  .dot-green  { background: var(--green); }
+  .dot-orange { background: var(--orange); }
+  .dot-purple { background: var(--purple); }
+  .dot-yellow { background: #facc15; }
+
+  /* ── Architecture diagram ── */
+  .arch-diagram {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .arch-row { display: flex; align-items: stretch; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+  .arch-box {
+    flex: 1; min-width: 160px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .arch-box .arch-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text2); margin-bottom: 4px; }
+  .arch-box .arch-name  { font-size: 14px; font-weight: 600; color: var(--white); }
+  .arch-box .arch-desc  { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .arch-arrow { display: flex; align-items: center; font-size: 20px; color: var(--blue2); }
+
+  /* ── Workflow steps ── */
+  .workflow { margin: 16px 0; }
+  .step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--blue2), var(--blue));
+    color: #fff;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-text { font-size: 14px; color: var(--text2); line-height: 1.6; }
+  .step-text strong { color: var(--text); }
+
+  /* ── Highlight box ── */
+  .highlight-box {
+    background: rgba(56,189,248,.06);
+    border: 1px solid rgba(56,189,248,.2);
+    border-left: 4px solid var(--blue2);
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .highlight-box p { font-size: 13.5px; color: var(--text2); }
+  .highlight-box strong { color: var(--white); }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 32px 0;
+    border-top: 1px solid var(--border);
+    color: var(--text2);
+    font-size: 13px;
+  }
+  .footer a { color: var(--blue); text-decoration: none; }
+
+  /* ── API method badges ── */
+  .method { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 5px; }
+  .method.get  { background: rgba(52,211,153,.15); color: var(--green); }
+  .method.post { background: rgba(251,146,60,.15);  color: var(--orange); }
+
+  /* ── Key highlights ── */
+  .highlights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin: 16px 0; }
+  .hl-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: border-color .2s;
+  }
+  .hl-card:hover { border-color: var(--blue2); }
+  .hl-icon  { font-size: 22px; margin-bottom: 8px; }
+  .hl-title { font-size: 13px; font-weight: 600; color: var(--white); margin-bottom: 4px; }
+  .hl-desc  { font-size: 12px; color: var(--text2); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ COVER ══════════════════════════════════════════════════════════════ -->
+  <div class="cover">
+    <div class="cover-badge">Project Analysis Document</div>
+    <h1>⚡ <span>HR-Time</span> Workshop Attendance Portal</h1>
+    <p class="sub">เอกสารวิเคราะห์และคู่มือการใช้งานระบบ — HR Workshop Attendance & Food Allowance Management</p>
+    <div class="cover-meta">
+      <div class="meta-pill">📦 Version <strong>1.0.0</strong></div>
+      <div class="meta-pill">📅 <strong>กรกฎาคม 2026</strong></div>
+      <div class="meta-pill">👥 Dev: <strong>Antigravity AI & HR Team</strong></div>
+      <div class="meta-pill">📄 License: <strong>ISC</strong></div>
+    </div>
+    <div style="margin-top:20px;">
+      <a class="live-link" href="https://supawatth-dot.github.io/HR-Time-Portal/" target="_blank">
+        🌐 เข้าใช้งาน Live
+      </a>
+      &nbsp;
+      <a class="live-link" style="background:linear-gradient(135deg,#334155,#475569);" href="https://github.com/supawatth-dot/HR-Time-Portal" target="_blank">
+        GitHub Repository
+      </a>
+    </div>
+  </div>
+
+  <!-- ══ 1. ภาพรวม ══════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">1</span> ภาพรวมโปรเจค (Executive Overview)</h2>
+    <div class="highlight-box">
+      <p>ระบบเว็บแอปพลิเคชันสำหรับ <strong>ฝ่าย HR</strong> ใช้ประมวลผลข้อมูลการเข้า-ออกงานจากเครื่องรูดบัตร/แตะบัตร เพื่อคำนวณสิทธิ์การเบิก <strong>"ค่าข้าววันละ 25 บาท"</strong> ของพนักงาน Workshop โดยอัตโนมัติ รองรับข้อมูลกว่า 15,000+ รายการ และประมวลผลเสร็จภายใน <strong>1 วินาที</strong></p>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>รายการ</th><th>รายละเอียด</th></tr></thead>
+        <tbody>
+          <tr><td>ชื่อโปรเจค</td><td>HR-Time Workshop Attendance & Allowance Portal</td></tr>
+          <tr><td>ไฟล์ข้อมูลหลัก</td><td><code class="mono">Clock in and out_01.01.26 to 30.06.26.xlsx</code></td></tr>
+          <tr><td>ภาษาที่รองรับ</td><td>🇹🇭 ไทย / 🇬🇧 English (สลับได้ทันที)</td></tr>
+          <tr><td>Theme</td><td>🌙 Dark Mode / ☀️ Light Mode</td></tr>
+          <tr><td>GitHub</td><td><a href="https://github.com/supawatth-dot/HR-Time-Portal" style="color:var(--blue)">supawatth-dot/HR-Time-Portal</a></td></tr>
+          <tr><td>Live URL</td><td><a href="https://supawatth-dot.github.io/HR-Time-Portal/" style="color:var(--blue)">supawatth-dot.github.io/HR-Time-Portal/</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 2. สถิติ ═══════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">2</span> สถิติผลลัพธ์ข้อมูลบริษัท (ม.ค. – มิ.ย. 2026)</h2>
+    <p class="desc">ผลจากการประมวลผลไฟล์ข้อมูลจริงของบริษัท รอบ H1/2026</p>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-value">89</div>
+        <div class="stat-label">จำนวนพนักงานทั้งหมด</div>
+        <div class="stat-sub">มีประวัติแตะบัตรในรอบ 6 เดือน</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="stat-icon">📑</div>
+        <div class="stat-value">15,755</div>
+        <div class="stat-label">รายการแตะบัตรทั้งหมด</div>
+        <div class="stat-sub">คิดเป็น 11,527 กะงาน</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value">8,331</div>
+        <div class="stat-label">วันที่เข้าตรงเวลา (ได้ค่าข้าว)</div>
+        <div class="stat-sub">อัตราความตรงเวลา 72%</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-icon">❌</div>
+        <div class="stat-value">3,196</div>
+        <div class="stat-label">วันที่มาสาย (ตัดสิทธิ์)</div>
+        <div class="stat-sub">อัตราการมาสาย 28%</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-icon">🌟</div>
+        <div class="stat-value">2,522</div>
+        <div class="stat-label">กะ Fri & Pre-Holiday</div>
+        <div class="stat-sub">เกณฑ์พิเศษ 07:00–16:00 น.</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-icon">💰</div>
+        <div class="stat-value">208,275฿</div>
+        <div class="stat-label">ยอดรวมค่าข้าวทั้งบริษัท</div>
+        <div class="stat-sub">8,331 วัน × 25 บาท</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 3. กฎธุรกิจ ══════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">3</span> กฎและเกณฑ์การคำนวณ (Business Rules Engine)</h2>
+    <div class="rule-grid">
+      <div class="rule-card">
+        <h4>⭐ โหมด Workshop <span class="chip chip-blue">Default</span></h4>
+        <ul>
+          <li><strong>จันทร์–พฤหัส:</strong> เข้า 08:00 | ออก 17:00 น.</li>
+          <li><strong>ศุกร์ & Pre-Holiday:</strong> เข้า 07:00 | ออก 16:00 น.</li>
+          <li>สาย > 1 นาที → ตัดสิทธิ์ค่าข้าว 0฿</li>
+          <li>ตรงเวลา + ทำงานจริง → +25฿/วัน</li>
+        </ul>
+      </div>
+      <div class="rule-card">
+        <h4>📋 โหมด Office</h4>
+        <ul>
+          <li><strong>เข้างาน:</strong> ไม่เกิน 09:00 น.</li>
+          <li><strong>ชั่วโมงงาน:</strong> ต้องครบ 8 ชั่วโมง</li>
+          <li>มาสาย หรือไม่ครบ 8 ชม. → ตัดสิทธิ์</li>
+        </ul>
+      </div>
+    </div>
+    <h3 class="sub-title">🗓️ ระบบวันหยุดและ Pre-Holiday Auto-Mapping</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>ฟีเจอร์</th><th>รายละเอียด</th></tr></thead>
+        <tbody>
+          <tr><td>วันหยุดพรีโหลด</td><td>18 วันหยุดราชการไทยปี 2026 พร้อมใช้งานทันที</td></tr>
+          <tr><td>Auto Pre-Holiday</td><td>ระบบหา "วันทำการก่อนหน้า" อัตโนมัติ เช่น หยุดอังคาร → จันทร์ปรับเป็น 07:00 น.</td></tr>
+          <tr><td>Manual Override</td><td>เพิ่มวัน 07:00 น. แบบ Manual ได้ตามต้องการ</td></tr>
+          <tr><td>Storage</td><td>บันทึกผ่าน <code class="mono">POST /api/holidays</code> → <code class="mono">holidays.json</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 4. Architecture ══════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">4</span> สถาปัตยกรรมระบบ (System Architecture)</h2>
+
+    <h3 class="sub-title">🌐 Mode 1 — GitHub Pages (Production / Static)</h3>
+    <div class="arch-diagram">
+      <div class="arch-row">
+        <div class="arch-box">
+          <div class="arch-label">User</div>
+          <div class="arch-name">🖥️ Browser</div>
+          <div class="arch-desc">เปิด URL ออนไลน์</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-label">Hosting</div>
+          <div class="arch-name">☁️ GitHub Pages</div>
+          <div class="arch-desc">Serve static files</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-label">Engine</div>
+          <div class="arch-name">⚡ SheetJS (Client)</div>
+          <div class="arch-desc">อ่าน Excel ใน Browser</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-label">Result</div>
+          <div class="arch-name">📊 ผลลัพธ์</div>
+          <div class="arch-desc">แสดงทันทีใน UI</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--text2);margin-top:6px;">ไม่มี Server — ทุกอย่างคำนวณใน Browser | Deploy อัตโนมัติผ่าน GitHub Actions</p>
+    </div>
+
+    <h3 class="sub-title">🖧 Mode 2 — Local Server (Node.js + Express)</h3>
+    <div class="arch-diagram">
+      <div class="arch-row">
+        <div class="arch-box">
+          <div class="arch-label">User</div>
+          <div class="arch-name">🖥️ Browser</div>
+          <div class="arch-desc">localhost:3000</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-label">Server</div>
+          <div class="arch-name">🟢 Node.js Express</div>
+          <div class="arch-desc">API Routes + Static</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-label">Parser</div>
+          <div class="arch-name">📄 SheetJS (Server)</div>
+          <div class="arch-desc">อ่าน xlsx → JSON</div>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-label">Storage</div>
+          <div class="arch-name">💾 holidays.json</div>
+          <div class="arch-desc">วันหยุดบริษัท</div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="sub-title">📁 โครงสร้างไฟล์ (File Structure)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>ไฟล์ / โฟลเดอร์</th><th>หน้าที่</th></tr></thead>
+        <tbody>
+          <tr><td><code class="mono">server.js</code></td><td>Express.js Backend — API Endpoints ทั้งหมด</td></tr>
+          <tr><td><code class="mono">package.json</code></td><td>Node.js Project Config & Dependencies</td></tr>
+          <tr><td><code class="mono">holidays.json</code></td><td>วันหยุดบริษัทปี 2026 (18 วัน) — Server copy</td></tr>
+          <tr><td><code class="mono">index.html</code></td><td>Redirect page ไปยัง public/index.html</td></tr>
+          <tr><td><code class="mono">public/index.html</code></td><td>UI หลักของแอป (557 บรรทัด HTML)</td></tr>
+          <tr><td><code class="mono">public/js/app.js</code></td><td>Business Logic & UI Engine (1,453 บรรทัด JS)</td></tr>
+          <tr><td><code class="mono">public/css/style.css</code></td><td>Glassmorphism UI Styles</td></tr>
+          <tr><td><code class="mono">public/holidays.json</code></td><td>วันหยุดสำหรับ Client-Side (GitHub Pages)</td></tr>
+          <tr><td><code class="mono">Clock in and out_*.xlsx</code></td><td>ไฟล์ข้อมูลแตะบัตรตัวอย่าง H1/2026</td></tr>
+          <tr><td><code class="mono">.github/workflows/</code></td><td>GitHub Actions CI/CD Pipeline</td></tr>
+          <tr><td><code class="mono">uploads/</code></td><td>โฟลเดอร์ชั่วคราวสำหรับไฟล์ Upload</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 5. Tech Stack ══════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">5</span> เทคโนโลยีที่ใช้ (Tech Stack)</h2>
+
+    <h3 class="sub-title">🟢 Backend</h3>
+    <div class="tech-grid">
+      <div class="tech-badge"><span class="dot dot-green"></span>Node.js LTS</div>
+      <div class="tech-badge"><span class="dot dot-green"></span>Express.js ^4.18.2</div>
+      <div class="tech-badge"><span class="dot dot-orange"></span>Multer ^1.4.5</div>
+      <div class="tech-badge"><span class="dot dot-blue"></span>SheetJS ^0.18.5</div>
+      <div class="tech-badge"><span class="dot dot-yellow"></span>CORS ^2.8.5</div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Package</th><th>Version</th><th>การใช้งาน</th></tr></thead>
+        <tbody>
+          <tr><td>express</td><td><code class="mono">^4.18.2</code></td><td>Web Framework — HTTP Server & API Routing</td></tr>
+          <tr><td>multer</td><td><code class="mono">^1.4.5-lts.1</code></td><td>Middleware จัดการ File Upload (.xlsx)</td></tr>
+          <tr><td>xlsx</td><td><code class="mono">^0.18.5</code></td><td>อ่านและแปลงไฟล์ Excel เป็น JSON</td></tr>
+          <tr><td>cors</td><td><code class="mono">^2.8.5</code></td><td>Cross-Origin Resource Sharing</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-title">🎨 Frontend</h3>
+    <div class="tech-grid">
+      <div class="tech-badge"><span class="dot dot-orange"></span>HTML5</div>
+      <div class="tech-badge"><span class="dot dot-blue"></span>CSS3 Glassmorphism</div>
+      <div class="tech-badge"><span class="dot dot-yellow"></span>Vanilla JavaScript</div>
+      <div class="tech-badge"><span class="dot dot-green"></span>SheetJS (CDN)</div>
+      <div class="tech-badge"><span class="dot dot-purple"></span>Google Fonts</div>
+      <div class="tech-badge"><span class="dot dot-blue"></span>LocalStorage</div>
+    </div>
+
+    <h3 class="sub-title">🚀 DevOps & CI/CD</h3>
+    <div class="tech-grid">
+      <div class="tech-badge"><span class="dot dot-orange"></span>GitHub Actions</div>
+      <div class="tech-badge"><span class="dot dot-blue"></span>GitHub Pages</div>
+      <div class="tech-badge"><span class="dot dot-green"></span>Git</div>
+    </div>
+  </div>
+
+  <!-- ══ 6. ฟีเจอร์หลัก ══════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">6</span> ฟีเจอร์หลักของระบบ (Core Features)</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>หมวด</th><th>ฟีเจอร์</th></tr></thead>
+        <tbody>
+          <tr><td>📂 นำเข้าข้อมูล</td><td>Auto-Load Excel ตัวอย่าง | Drag & Drop Upload .xlsx/.xls/.csv | รองรับ 15,000+ รายการ</td></tr>
+          <tr><td>📊 แสดงผล</td><td>Tab สรุปรายบุคคล | Tab รายละเอียดรายวัน | Tab Insights Dashboard | Modal ประวัติพนักงาน</td></tr>
+          <tr><td>🔍 ค้นหา</td><td>Search พนักงาน | Filter ตาม Shift / เดือน | Pagination 100 รายการ/หน้า</td></tr>
+          <tr><td>📥 ส่งออก</td><td>Export Excel (.xlsx) | Export CSV | พิมพ์/PDF ใบเบิกค่าข้าว A4</td></tr>
+          <tr><td>🗓️ วันหยุด</td><td>18 วันหยุดพรีโหลด | Custom เพิ่ม/ลบ | Pre-Holiday Auto-Map | Manual Override</td></tr>
+          <tr><td>🎨 UX</td><td>Dark/Light Mode | ภาษาไทย/EN Toggle | Responsive | Glassmorphism UI</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 7. API Endpoints ══════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">7</span> API Endpoints (Local Server Mode)</h2>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Method</th><th>Endpoint</th><th>หน้าที่</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="method get">GET</span></td>
+            <td><code class="mono">/api/holidays</code></td>
+            <td>ดึงข้อมูลวันหยุดทั้งหมดจาก holidays.json</td>
+          </tr>
+          <tr>
+            <td><span class="method post">POST</span></td>
+            <td><code class="mono">/api/holidays</code></td>
+            <td>บันทึก/อัปเดตวันหยุดบริษัท</td>
+          </tr>
+          <tr>
+            <td><span class="method get">GET</span></td>
+            <td><code class="mono">/api/default-excel</code></td>
+            <td>ดึงข้อมูลจากไฟล์ Excel ที่ฝังในระบบ (H1/2026)</td>
+          </tr>
+          <tr>
+            <td><span class="method post">POST</span></td>
+            <td><code class="mono">/api/upload</code></td>
+            <td>อัปโหลดไฟล์ Excel ใหม่ (multipart/form-data) แปลงเป็น JSON</td>
+          </tr>
+          <tr>
+            <td><span class="method get">GET</span></td>
+            <td><code class="mono">/public/*</code></td>
+            <td>Serve Static Files — HTML, JS, CSS, JSON</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 8. Quick Start ══════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">8</span> วิธีการใช้งานและติดตั้ง (Quick Start)</h2>
+
+    <div class="rule-grid">
+      <div class="rule-card">
+        <h4>🌐 วิธีที่ 1 — Online (แนะนำ)</h4>
+        <ul>
+          <li>เปิดเบราว์เซอร์</li>
+          <li>ไปที่ <strong>supawatth-dot.github.io/HR-Time-Portal/</strong></li>
+          <li>ระบบโหลดข้อมูลตัวอย่างอัตโนมัติ ✅</li>
+          <li>ไม่ต้องติดตั้งอะไร</li>
+        </ul>
+      </div>
+      <div class="rule-card">
+        <h4>🖧 วิธีที่ 2 — Local Server</h4>
+        <ul>
+          <li><code class="mono">git clone [repo]</code></li>
+          <li><code class="mono">npm install</code></li>
+          <li><code class="mono">npm start</code></li>
+          <li>เปิด <strong>localhost:3000</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="sub-title">📋 Workflow การใช้งานประจำเดือน</h3>
+    <div class="workflow">
+      <div class="step"><div class="step-num">1</div><div class="step-text"><strong>เปิดแอป</strong> — ออนไลน์หรือ localhost:3000</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text"><strong>Auto-Load</strong> — ระบบโหลดข้อมูล H1/2026 ทันที</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text"><strong>เลือกโหมด</strong> — Workshop (08:00/07:00) หรือ Office (09:00 + 8ชม.)</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text"><strong>ตรวจวันหยุด</strong> — ปรับ/เพิ่มวันหยุดบริษัทในส่วน Holiday Management</div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text"><strong>ดูสรุป</strong> — Tab "สรุปรายบุคคล" พร้อมยอดค่าข้าวสะสมรายคน</div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text"><strong>Export</strong> — ดาวน์โหลด Excel/CSV หรือพิมพ์ใบเบิกค่าข้าว A4</div></div>
+      <div class="step"><div class="step-num">7</div><div class="step-text"><strong>เดือนถัดไป</strong> — Drag & Drop ไฟล์ Excel ใหม่มาวางที่ Dropzone</div></div>
+    </div>
+  </div>
+
+  <!-- ══ 9. จุดเด่น ══════════════════════════════════════════════════════════ -->
+  <div class="section">
+    <h2 class="sec-title"><span class="num">9</span> สรุปจุดเด่น (Key Highlights)</h2>
+    <div class="highlights-grid">
+      <div class="hl-card">
+        <div class="hl-icon">⚡</div>
+        <div class="hl-title">ประสิทธิภาพสูง</div>
+        <div class="hl-desc">ประมวลผล 15,000+ รายการใน &lt; 1 วินาที</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">🔒</div>
+        <div class="hl-title">ข้อมูลปลอดภัย</div>
+        <div class="hl-desc">Excel ประมวลผลใน Browser ไม่ส่งออกไปที่ใด</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">🎯</div>
+        <div class="hl-title">ตรงนโยบายบริษัท</div>
+        <div class="hl-desc">Pre-Holiday Auto-Map, 2 โหมด Workshop/Office</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">🌐</div>
+        <div class="hl-title">Zero-Config Online</div>
+        <div class="hl-desc">GitHub Pages ไม่ต้องติดตั้ง Server ใดๆ</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">📊</div>
+        <div class="hl-title">Export พร้อมใช้</div>
+        <div class="hl-desc">ส่งออก Excel/CSV เข้าโปรแกรมเงินเดือนทันที</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">🇹🇭</div>
+        <div class="hl-title">รองรับภาษาไทย</div>
+        <div class="hl-desc">UI เต็มรูปแบบ + Google Font Noto Sans Thai</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">🔄</div>
+        <div class="hl-title">CI/CD อัตโนมัติ</div>
+        <div class="hl-desc">GitHub Actions Deploy ทันทีเมื่อ Push โค้ด</div>
+      </div>
+      <div class="hl-card">
+        <div class="hl-icon">📱</div>
+        <div class="hl-title">Responsive</div>
+        <div class="hl-desc">ใช้งานได้ทุกอุปกรณ์ — Desktop, Tablet, Mobile</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Footer ══════════════════════════════════════════════════════════════ -->
+  <div class="footer">
+    <p>⚡ HR-Time Workshop Attendance Portal — เอกสารจัดทำด้วย <strong>Claude AI Cowork Mode</strong> — กรกฎาคม 2026</p>
+    <p style="margin-top:6px;">
+      <a href="https://supawatth-dot.github.io/HR-Time-Portal/">🌐 Live App</a>
+      &nbsp;·&nbsp;
+      <a href="https://github.com/supawatth-dot/HR-Time-Portal">GitHub</a>
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
