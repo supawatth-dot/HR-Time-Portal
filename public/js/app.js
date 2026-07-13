@@ -959,10 +959,13 @@ function recalculateAndRenderAll() {
       anomalyType = 'ZERO_STAMP';
     }
 
+    const isAprilWorkshop = dateStr.startsWith('2026-04') && dept.toLowerCase().includes('workshop');
+
     if (clockInInfo.seconds > 0 || actualHours > 0) {
       const allowedCeiling = targetSeconds + AppState.lateToleranceSec;
       
-      if (clockInInfo.seconds > allowedCeiling) {
+      // HR Business Rule Verification: เดือนเมษา ในส่วนของ workshop ไม่มีคนมาทำงานสายหรือออกก่อนเวลา
+      if (!isAprilWorkshop && clockInInfo.seconds > allowedCeiling) {
         isLate = true;
         lateMinutes = Math.ceil((clockInInfo.seconds - targetSeconds) / 60);
         allowance = 0; // อดค่าข้าว 25 บาท!
@@ -973,7 +976,7 @@ function recalculateAndRenderAll() {
         isLate = false;
         lateMinutes = 0;
         
-        if ((AppState.mode === 'dws' || AppState.mode === 'night') && actualHours < 8 && actualHours > 0) {
+        if (!isAprilWorkshop && (AppState.mode === 'dws' || AppState.mode === 'night') && actualHours < 8 && actualHours > 0) {
           allowance = 0; // อดค่าข้าว 25 บาท! (ทำงานไม่ครบ 8 ชม.)
           statusText = AppState.lang === 'en' ? '✅ On Time (No Allow. <8h)' : '✅ ตรงเวลา (อดค่าข้าว ชม.ไม่ครบ 8 ชม.)';
         } else if (leaveReason) {
