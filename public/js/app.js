@@ -677,7 +677,7 @@ function excelSerialToDateStr(serial) {
  */
 function getDayOfWeekSafe(dateStr) {
   if (!dateStr || typeof dateStr !== 'string') return 0;
-  const parts = dateStr.split('-').map(Number);
+  const parts = dateStr.split('-').map(part => parseInt(part, 10));
   if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
     const dt = new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
     return dt.getDay();
@@ -691,18 +691,19 @@ function getDayOfWeekSafe(dateStr) {
  */
 function excelSerialToTimeInfo(serialTime) {
   if (typeof serialTime === 'string') {
-    if (serialTime.includes(':')) {
-      const parts = serialTime.split(':').map(Number);
-      const hh = parts[0] || 0;
-      const mm = parts[1] || 0;
-      const ss = parts[2] || 0;
+    const s = serialTime.trim();
+    if (s.includes(':')) {
+      const parts = s.split(':').map(part => parseInt(part, 10));
+      const hh = !isNaN(parts[0]) ? parts[0] : 0;
+      const mm = !isNaN(parts[1]) ? parts[1] : 0;
+      const ss = !isNaN(parts[2]) ? parts[2] : 0;
       const totalSeconds = hh * 3600 + mm * 60 + ss;
       return {
         str: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`,
         seconds: totalSeconds
       };
     }
-    const num = parseFloat(serialTime);
+    const num = parseFloat(s);
     if (!isNaN(num)) serialTime = num;
   }
   if (typeof serialTime !== 'number' || isNaN(serialTime) || serialTime <= 0) {
@@ -720,14 +721,16 @@ function excelSerialToTimeInfo(serialTime) {
 
 /**
  * Parse Target Time in Seconds from DWS Text (e.g. "WD 08:00-17:00" -> 08:00:00 = 28800)
+ * Uses explicit parseInt with radix 10 to guarantee immunity from Octal parsing hazards on strings starting with 0 (e.g. 08:00, 09:00).
  */
 function parseTargetSecondsFromDWS(dwsText) {
   if (!dwsText || typeof dwsText !== 'string') return null;
-  // Look for pattern like 08:00 or 07:00 or 08:30
-  const match = dwsText.match(/(\d{2}):(\d{2})/);
+  // Look for pattern like 08:00 or 07:00 or 8:30 or 08.00
+  const match = dwsText.match(/(\d{1,2})[:.](\d{2})/);
   if (match) {
     const hh = parseInt(match[1], 10);
     const mm = parseInt(match[2], 10);
+    if (isNaN(hh) || isNaN(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
     return hh * 3600 + mm * 60;
   }
   return null;
