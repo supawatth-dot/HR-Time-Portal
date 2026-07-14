@@ -104,10 +104,19 @@ ALTER TABLE public.company_holidays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.department_rules ENABLE ROW LEVEL SECURITY;
 
 -- นโยบายเปิดให้ระบบหลังบ้านและ HR ภายในองค์กรอ่าน/เขียนข้อมูลได้ผ่าน Service & Anon Key
+DROP POLICY IF EXISTS "Allow all internal access on attendance_records" ON public.attendance_records;
 CREATE POLICY "Allow all internal access on attendance_records" ON public.attendance_records FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all internal access on attendance_overrides" ON public.attendance_overrides;
 CREATE POLICY "Allow all internal access on attendance_overrides" ON public.attendance_overrides FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all internal access on shift_schedules" ON public.shift_schedules;
 CREATE POLICY "Allow all internal access on shift_schedules" ON public.shift_schedules FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all internal access on company_holidays" ON public.company_holidays;
 CREATE POLICY "Allow all internal access on company_holidays" ON public.company_holidays FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all internal access on department_rules" ON public.department_rules;
 CREATE POLICY "Allow all internal access on department_rules" ON public.department_rules FOR ALL USING (true) WITH CHECK (true);
 
 -- สั่งแสดงสถานะหลังรัน SQL สำเร็จ
