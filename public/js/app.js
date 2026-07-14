@@ -1529,45 +1529,50 @@ function recalculateAndRenderAll() {
     const isOfficeRole = !isWorkshop || effectiveMode === 'dws' || /office|account|sales|hr|purchas|admin/i.test(dept);
     const isClockIn1200 = clockInInfo.seconds === 43200 || clockInInfo.str.startsWith('12:00');
 
+    const isWeekendOrOff = (dayOfWeek === 0 || dayOfWeek === 6 || dwsText === 'OFF' || dwsText === 'วันหยุด' || dwsText === '-' || dwsText === '');
+
     if (clockInInfo.seconds > 0 || actualHours > 0 || clockOutInfo.seconds > 0) {
-      if (isWorkshop && isClockIn1200) {
-        // ถ้าวันไหนที่เวลา clock in = 12:00:00 ไม่ต้องสนใจ
+      if (isWeekendOrOff) {
+        // 🏖️ WEEKEND OR DAY OFF WORK LOGIC:
+        // "วันเสาร์อาทิตย์ไม่ต้องลงว่าตรงเวลา ค่าข้าวไม่ได้"
         isLate = false;
         lateMinutes = 0;
         isEarlyOut = false;
         earlyOutMinutes = 0;
         allowance = 0;
+        statusText = AppState.lang === 'en' ? '📌 Weekend / Day Off Work' : '📌 ทำงานวันหยุด (เสาร์-อาทิตย์/OFF)';
+      } else if (isWorkshop && isClockIn1200) {
+        // ถ้าวันปกติที่เวลา clock in = 12:00:00 ไม่ต้องสนใจ
+        isLate = false;
+        lateMinutes = 0;
+        isEarlyOut = false;
+        earlyOutMinutes = 0;
+        allowance = (actualHours >= 8.0 && !leaveReason && !isAbsent) ? 25 : 0;
         statusText = AppState.lang === 'en' ? '✅ On Time (Clock In 12:00)' : '✅ ไม่คิดสาย/ออกก่อน (เข้า 12:00)';
         totalOntimeDays++;
       } else if (isOfficeRole && !shiftInfo.isMasterOverride && !isNightShift) {
         // 🏢 OFFICE LOGIC:
-        // 1. "ในส่วนของ office ดูแค่ ใครมาหลัง 09:00" -> Late only if clockInInfo.seconds > 32400 (09:00:00)
+        allowance = 0; // Office เริ่มจาก workshop ก่อน
         if (clockInInfo.seconds > 32400 && clockInInfo.seconds > 0) {
           isLate = true;
           lateMinutes = Math.ceil((clockInInfo.seconds - 32400) / 60);
-          allowance = 0;
           statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m (>09:00)` : `❌ สาย ${lateMinutes} นาที (หลัง 09:00)`;
           totalLateDays++;
           if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
         } else {
           isLate = false;
           lateMinutes = 0;
-          allowance = 0;
           if (leaveReason) {
             statusText = AppState.lang === 'en' ? `🏖️ Leave (${leaveReason})` : `🏖️ ลา (${leaveReason})`;
-          } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-            statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (วันหยุด)';
           } else {
             statusText = AppState.lang === 'en' ? '✅ On Time (<=09:00)' : '✅ ตรงเวลา (ไม่เกิน 09:00)';
           }
           totalOntimeDays++;
         }
 
-        // 2. "ส่วนการออกก่อนเวลาให้คำนวณจาก ชมว่าถ้าไม่ครบ 8-ชั่วโมง"
         if ((clockInInfo.seconds > 0 || normOutSecs > 0) && actualHours > 0 && actualHours < 8.0 && !leaveReason) {
           isEarlyOut = true;
           earlyOutMinutes = Math.ceil((8.0 - actualHours) * 60);
-          allowance = 0;
           totalEarlyOutDays++;
           if (statusText.includes('✅')) {
             statusText = AppState.lang === 'en' ? `⚠️ Early Out (-${earlyOutMinutes}m / <8h)` : `⚠️ ออกก่อน (${earlyOutMinutes} นาที / ไม่ครบ 8 ชม.)`;
@@ -1579,7 +1584,7 @@ function recalculateAndRenderAll() {
           earlyOutMinutes = 0;
         }
       } else {
-        // 🔧 WORKSHOP & MASTER SHIFT OVERRIDE LOGIC:
+        // 🔧 WORKSHOP & MASTER SHIFT OVERRIDE LOGIC (REGULAR WORK DAYS):
         const allowedCeiling = isWorkshop ? targetSeconds : (targetSeconds + AppState.lateToleranceSec);
         if (clockInInfo.seconds > allowedCeiling && clockInInfo.seconds > 0) {
           isLate = true;
@@ -1592,8 +1597,6 @@ function recalculateAndRenderAll() {
           lateMinutes = 0;
           if (leaveReason) {
             statusText = AppState.lang === 'en' ? `🏖️ Leave (${leaveReason})` : `🏖️ ลา (${leaveReason})`;
-          } else if (dayOfWeek === 0 || dayOfWeek === 6) {
-            statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (วันหยุด)';
           } else {
             statusText = AppState.lang === 'en' 
               ? (isNightShift ? `✅ On Time (${targetStr})` : '✅ On Time') 
@@ -1616,9 +1619,10 @@ function recalculateAndRenderAll() {
     }
 
     // ==========================================
-    // WORKSHOP FOOD ALLOWANCE ENGINE (฿25/วัน เมื่อทำงานครบ 8 ชม.)
+    // WORKSHOP FOOD ALLOWANCE ENGINE (฿25/วัน เมื่อทำงานครบ 8 ชม. ในวันทำงานปกติ)
+    // "วันเสาร์อาทิตย์ไม่ต้องลงว่าตรงเวลา ค่าข้าวไม่ได้ การคิดค่าข้าว วันที่มาทำงานครบ 8 ชม ได้ 25 บาท"
     // ==========================================
-    if (isWorkshop && actualHours >= 8.0 && !leaveReason && !isAbsent && clockInInfo.seconds > 0) {
+    if (!isWeekendOrOff && isWorkshop && actualHours >= 8.0 && !leaveReason && !isAbsent && clockInInfo.seconds > 0) {
       allowance = 25;
     } else {
       allowance = 0;
@@ -1631,15 +1635,17 @@ function recalculateAndRenderAll() {
     if (override && override.status === 'APPROVED') {
       isOverridden = true;
       if (isLate && totalLateDays > 0) totalLateDays--;
-      if (isLate) totalOntimeDays++;
+      if (isLate && !isWeekendOrOff) totalOntimeDays++;
       if (isEarlyOut && totalEarlyOutDays > 0) totalEarlyOutDays--;
       
       isLate = false;
       lateMinutes = 0;
       isEarlyOut = false;
       earlyOutMinutes = 0;
-      if (override.allowance === 25 || override.grantFoodAllowance || (isWorkshop && actualHours >= 8.0)) {
+      if (!isWeekendOrOff && (override.allowance === 25 || override.grantFoodAllowance === true || (isWorkshop && actualHours >= 8.0))) {
         allowance = 25;
+      } else {
+        allowance = 0; // วันเสาร์อาทิตย์และวันหยุด OFF ห้ามเบิกค่าข้าวทุกกรณีตามกฎใหม่
       }
       statusText = AppState.lang === 'en' ? `💡 Approved Override (Time Adjusted)` : `💡 อนุมัติแก้ไขเวลาเรียบร้อยแล้ว`;
       if (override.correctedIn) clockInInfo.str = override.correctedIn;
@@ -1709,7 +1715,7 @@ function recalculateAndRenderAll() {
     if (clockInInfo.seconds > 0 || actualHours > 0) {
       empMap[empId].totalDaysWorked++;
       if (isLate) empMap[empId].lateDays++;
-      else empMap[empId].ontimeDays++;
+      else if (!isWeekendOrOff) empMap[empId].ontimeDays++;
       if (isEarlyOut) empMap[empId].earlyOutDays = (empMap[empId].earlyOutDays || 0) + 1;
       if (isPreHoliday) empMap[empId].preHolidayShifts++;
       empMap[empId].totalAllowance += allowance;
@@ -3565,7 +3571,7 @@ async function syncSingleOverrideToSupabase(empId, dateStr, overrideData = null)
         override_in: overrideData.overrideIn || overrideData.correctedIn || overrideData.scanIn || null,
         override_out: overrideData.overrideOut || overrideData.correctedOut || overrideData.scanOut || null,
         override_shift: overrideData.overrideShift || overrideData.type || null,
-        grant_food_allowance: Boolean(overrideData.grantFoodAllowance || overrideData.allowance === 25 || overrideData.status === 'APPROVED'),
+        grant_food_allowance: Boolean(overrideData.grantFoodAllowance === true || overrideData.allowance === 25),
         reason: overrideData.reason || overrideData.note || 'HR Manual Override',
         approver: overrideData.approver || 'HR Portal User'
       });
