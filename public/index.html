@@ -591,7 +591,23 @@
               เปรียบเทียบจำนวนคนมาสาย, วันที่สายสะสม, นาทีที่สายสะสม, อัตราความตรงเวลา (%) และรายชื่อพนักงานที่มาสายบ่อยในแต่ละแผนก
             </p>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-secondary);">📅 เลือกเดือน:</span>
+            <select id="dept-report-month-filter" class="filter-select" style="min-width: 150px; font-weight: 600;" onchange="renderDeptReportTable()">
+              <option value="ALL">📅 ทุกเดือน (ทั้งหมด)</option>
+              <option value="01">มกราคม (Jan)</option>
+              <option value="02">กุมภาพันธ์ (Feb)</option>
+              <option value="03">มีนาคม (Mar)</option>
+              <option value="04">เมษายน (Apr)</option>
+              <option value="05">พฤษภาคม (May)</option>
+              <option value="06">มิถุนายน (Jun)</option>
+              <option value="07">กรกฎาคม (Jul)</option>
+              <option value="08">สิงหาคม (Aug)</option>
+              <option value="09">กันยายน (Sep)</option>
+              <option value="10">ตุลาคม (Oct)</option>
+              <option value="11">พฤศจิกายน (Nov)</option>
+              <option value="12">ธันวาคม (Dec)</option>
+            </select>
             <button class="btn btn-outline btn-sm" onclick="exportDeptReportXLSX()">📑 Export สรุปรายแผนก (.xlsx)</button>
             <button class="btn btn-primary btn-sm" onclick="exportDeptReportPDF()" style="background: linear-gradient(135deg, #10b981, #059669); border:none; font-weight: 600;">📄 พิมพ์รายงานสรุปรายแผนก (PDF)</button>
           </div>

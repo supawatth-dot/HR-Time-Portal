@@ -66,6 +66,8 @@ function setupEventListeners() {
         renderInsightsTab();
       } else if (targetTab === 'tab-dispute') {
         renderDisputeTab();
+      } else if (targetTab === 'tab-dept-report') {
+        if (typeof renderDeptReportTable === 'function') renderDeptReportTable();
       }
     });
   });
@@ -1731,6 +1733,9 @@ function recalculateAndRenderAll() {
   if (typeof renderDisputeTab === 'function') {
     renderDisputeTab();
   }
+  if (typeof renderDeptReportTable === 'function') {
+    renderDeptReportTable();
+  }
   if (AppState.currentTab === 'tab-insights') {
     renderInsightsTab();
   }
@@ -2703,24 +2708,30 @@ window.toggleSelectAllDisputes = toggleSelectAllDisputes;
 window.exportDisputeXLSX = exportDisputeXLSX;
 
 /**
- * Render Department Punctuality & Late Report Table (Tab 6)
+ * Render Department Punctuality & Late Report Table (Tab 6) - with Monthly Filter support
  */
 function renderDeptReportTable() {
   const tbody = document.getElementById('dept-report-tbody');
   const cardsContainer = document.getElementById('dept-kpi-cards');
   const badgeEl = document.getElementById('tab-dept-count');
+  const monthFilterEl = document.getElementById('dept-report-month-filter');
+  const selectedMonth = monthFilterEl ? monthFilterEl.value : 'ALL';
   
   if (!tbody || !cardsContainer) return;
 
-  const emps = Object.values(AppState.employeeSummary || {});
+  const records = AppState.processedRecords || [];
   const deptMap = {};
 
-  emps.forEach(emp => {
-    const d = emp.dept || 'ไม่ระบุแผนก';
+  records.forEach(r => {
+    if (selectedMonth !== 'ALL') {
+      const parts = r.dateStr.split('-');
+      if (parts.length >= 2 && parts[1] !== selectedMonth) return;
+    }
+
+    const d = r.dept || 'ไม่ระบุแผนก';
     if (!deptMap[d]) {
       deptMap[d] = {
         deptName: d,
-        empCount: 0,
         totalDaysWorked: 0,
         ontimeDays: 0,
         lateDays: 0,
@@ -2728,21 +2739,34 @@ function renderDeptReportTable() {
         earlyOutDays: 0,
         absentDays: 0,
         allowance: 0,
-        employees: []
+        empMap: {}
       };
     }
-    deptMap[d].empCount++;
-    deptMap[d].totalDaysWorked += (emp.totalDaysWorked || 0);
-    deptMap[d].ontimeDays += (emp.ontimeDays || 0);
-    deptMap[d].lateDays += (emp.lateDays || 0);
-    deptMap[d].lateMinutes += (emp.totalLateMinutes || 0);
-    deptMap[d].earlyOutDays += (emp.earlyOutDays || 0);
-    deptMap[d].absentDays += (emp.absentDays || 0);
-    deptMap[d].allowance += (emp.totalAllowance || 0);
-    deptMap[d].employees.push(emp);
+
+    const empKey = r.empId;
+    if (!deptMap[d].empMap[empKey]) {
+      deptMap[d].empMap[empKey] = { empId: r.empId, empName: r.empName, lateDays: 0, totalLateMinutes: 0 };
+    }
+
+    if (r.clockInSeconds > 0 || r.actualHours > 0 || r.leaveReason) deptMap[d].totalDaysWorked++;
+    if ((r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate) deptMap[d].ontimeDays++;
+    if (r.isLate) {
+      deptMap[d].lateDays++;
+      deptMap[d].lateMinutes += (r.lateMinutes || 0);
+      deptMap[d].empMap[empKey].lateDays++;
+      deptMap[d].empMap[empKey].totalLateMinutes += (r.lateMinutes || 0);
+    }
+    if (r.isEarlyOut) deptMap[d].earlyOutDays++;
+    if (r.isAbsent) deptMap[d].absentDays++;
+    deptMap[d].allowance += (r.allowance || 0);
   });
 
-  const deptList = Object.values(deptMap).sort((a, b) => b.lateDays - a.lateDays);
+  const deptList = Object.values(deptMap).map(d => {
+    d.empCount = Object.keys(d.empMap).length;
+    d.employees = Object.values(d.empMap);
+    return d;
+  }).sort((a, b) => b.lateDays - a.lateDays);
+
   if (badgeEl) badgeEl.textContent = deptList.length;
 
   // Compute Overall KPI Stats across all departments
@@ -2754,32 +2778,34 @@ function renderDeptReportTable() {
   const avgOntimeRate = totalWorkedAll > 0 ? ((totalOntimeAll / totalWorkedAll) * 100).toFixed(1) : '100.0';
   const mostLateDept = deptList.length > 0 ? deptList[0] : null;
 
+  const monthLabelText = selectedMonth === 'ALL' ? 'ทุกเดือน (ทั้งหมด)' : `เดือน ${selectedMonth}`;
+
   // Render Summary Cards
   cardsContainer.innerHTML = `
     <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #3b82f6; background: var(--bg-card);">
-      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🏢 จำนวนแผนกทั้งหมด</div>
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🏢 จำนวนแผนกทั้งหมด (${monthLabelText})</div>
       <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-main); margin: 6px 0;">${totalDepts} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">แผนก</span></div>
-      <div style="font-size: 0.78rem; color: var(--text-muted);">พนักงานรวม ${emps.length.toLocaleString()} คน</div>
+      <div style="font-size: 0.78rem; color: var(--text-muted);">พนักงานที่มีสถิติในเดือนนี้รวม ${deptList.reduce((sum, d) => sum + d.empCount, 0).toLocaleString()} คน</div>
     </div>
     <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #10b981; background: var(--bg-card);">
-      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🎉 อัตราความตรงเวลาเฉลี่ย</div>
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🎉 อัตราความตรงเวลาเฉลี่ย (${monthLabelText})</div>
       <div style="font-size: 1.8rem; font-weight: bold; color: #10b981; margin: 6px 0;">${avgOntimeRate}%</div>
       <div style="font-size: 0.78rem; color: var(--text-muted);">ตรงเวลา ${totalOntimeAll.toLocaleString()} จาก ${totalWorkedAll.toLocaleString()} วัน</div>
     </div>
     <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #ef4444; background: var(--bg-card);">
-      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🚨 แผนกที่มาสายมากที่สุด</div>
-      <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444; margin: 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mostLateDept ? mostLateDept.deptName : '-'}</div>
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🚨 แผนกที่มาสายมากที่สุด (${monthLabelText})</div>
+      <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444; margin: 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mostLateDept && mostLateDept.lateDays > 0 ? mostLateDept.deptName : '-'}</div>
       <div style="font-size: 0.78rem; color: #ef4444;">มาสายสะสม ${mostLateDept ? mostLateDept.lateDays.toLocaleString() : 0} วัน (${mostLateDept ? mostLateDept.lateMinutes.toLocaleString() : 0} นาที)</div>
     </div>
     <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #f59e0b; background: var(--bg-card);">
-      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">⏱️ เวลามารวมสายทั้งบริษัท</div>
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">⏱️ เวลามารวมสายทั้งบริษัท (${monthLabelText})</div>
       <div style="font-size: 1.8rem; font-weight: bold; color: #f59e0b; margin: 6px 0;">${totalLateMinsAll.toLocaleString()} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">นาที</span></div>
       <div style="font-size: 0.78rem; color: var(--text-muted);">คิดเป็น ${(totalLateMinsAll / 60).toFixed(1)} ชั่วโมงทำงาน</div>
     </div>
   `;
 
   if (deptList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted" style="padding: 2rem;">ไม่พบข้อมูลแผนก</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted" style="padding: 2rem;">ไม่พบข้อมูลแผนกในเดือนที่เลือก</td></tr>';
     return;
   }
 
@@ -2789,7 +2815,6 @@ function renderDeptReportTable() {
     if (parseFloat(rate) < 90) rateClass = 'badge-danger';
     else if (parseFloat(rate) < 95) rateClass = 'badge-warning';
 
-    // Sort employees by late days descending and take top 3
     const topLate = [...d.employees].sort((a, b) => (b.lateDays || 0) - (a.lateDays || 0)).filter(e => e.lateDays > 0).slice(0, 3);
     const topLateHTML = topLate.length > 0 
       ? topLate.map((e, i) => `<div style="font-size: 0.82rem; margin-bottom: 3px;"><strong>#${i+1} ${e.empName}</strong> <span style="color: #ef4444; font-weight: 600;">(${e.lateDays} วัน / ${(e.totalLateMinutes||0)}น.)</span></div>`).join('')
@@ -2815,87 +2840,132 @@ function renderDeptReportTable() {
 }
 
 /**
- * Export Department Report to Excel (.xlsx)
+ * Export Department Report to Excel (.xlsx) with Monthly Filter support
  */
 function exportDeptReportXLSX() {
-  const emps = Object.values(AppState.employeeSummary || {});
+  const monthFilterEl = document.getElementById('dept-report-month-filter');
+  const selectedMonth = monthFilterEl ? monthFilterEl.value : 'ALL';
+  const records = AppState.processedRecords || [];
   const deptMap = {};
 
-  emps.forEach(emp => {
-    const d = emp.dept || 'ไม่ระบุแผนก';
-    if (!deptMap[d]) {
-      deptMap[d] = { deptName: d, empCount: 0, totalDaysWorked: 0, ontimeDays: 0, lateDays: 0, lateMinutes: 0, earlyOutDays: 0, absentDays: 0, allowance: 0 };
+  records.forEach(r => {
+    if (selectedMonth !== 'ALL') {
+      const parts = r.dateStr.split('-');
+      if (parts.length >= 2 && parts[1] !== selectedMonth) return;
     }
-    deptMap[d].empCount++;
-    deptMap[d].totalDaysWorked += (emp.totalDaysWorked || 0);
-    deptMap[d].ontimeDays += (emp.ontimeDays || 0);
-    deptMap[d].lateDays += (emp.lateDays || 0);
-    deptMap[d].lateMinutes += (emp.totalLateMinutes || 0);
-    deptMap[d].earlyOutDays += (emp.earlyOutDays || 0);
-    deptMap[d].absentDays += (emp.absentDays || 0);
-    deptMap[d].allowance += (emp.totalAllowance || 0);
+    const d = r.dept || 'ไม่ระบุแผนก';
+    if (!deptMap[d]) {
+      deptMap[d] = { deptName: d, empCount: 0, totalDaysWorked: 0, ontimeDays: 0, lateDays: 0, lateMinutes: 0, earlyOutDays: 0, absentDays: 0, allowance: 0, empMap: {} };
+    }
+    if (!deptMap[d].empMap[r.empId]) deptMap[d].empMap[r.empId] = 1;
+    if (r.clockInSeconds > 0 || r.actualHours > 0 || r.leaveReason) deptMap[d].totalDaysWorked++;
+    if ((r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate) deptMap[d].ontimeDays++;
+    if (r.isLate) { deptMap[d].lateDays++; deptMap[d].lateMinutes += (r.lateMinutes || 0); }
+    if (r.isEarlyOut) deptMap[d].earlyOutDays++;
+    if (r.isAbsent) deptMap[d].absentDays++;
+    deptMap[d].allowance += (r.allowance || 0);
   });
 
-  const data = Object.values(deptMap).sort((a, b) => b.lateDays - a.lateDays).map((d, idx) => {
-    const rate = d.totalDaysWorked > 0 ? ((d.ontimeDays / d.totalDaysWorked) * 100).toFixed(1) + '%' : '100.0%';
+  const deptList = Object.values(deptMap).map(d => {
+    d.empCount = Object.keys(d.empMap).length;
+    return d;
+  }).sort((a, b) => b.lateDays - a.lateDays);
+
+  if (deptList.length === 0) {
+    alert('ไม่พบข้อมูลแผนกสำหรับส่งออก Excel ในเดือนที่เลือก');
+    return;
+  }
+
+  const exportRows = deptList.map((d, idx) => {
+    const rate = d.totalDaysWorked > 0 ? ((d.ontimeDays / d.totalDaysWorked) * 100).toFixed(1) : '100.0';
     return {
-      'ลำดับ (No.)': idx + 1,
+      'ลำดับ': idx + 1,
       'ชื่อแผนก (Department)': d.deptName,
-      'จำนวนพนักงาน (Employees)': d.empCount,
-      'วันทำงานรวม (Worked Days)': d.totalDaysWorked,
-      'ตรงเวลา (On-time Days)': d.ontimeDays,
-      'มาสายรวม (Late Days)': d.lateDays,
-      'นาทีสายสะสม (Late Minutes)': d.lateMinutes,
-      'ออกก่อนเวลา (Early Out Days)': d.earlyOutDays,
-      'ขาดงาน (Absent Days)': d.absentDays,
-      'ยอดเบิกค่าข้าว (Allowance Baht)': d.allowance,
-      'อัตราตรงเวลา (Punctuality Rate)': rate
+      'จำนวนพนักงาน (คน)': d.empCount,
+      'วันทำงานรวม (วัน)': d.totalDaysWorked,
+      'ตรงเวลา (วัน)': d.ontimeDays,
+      'มาสาย (วัน)': d.lateDays,
+      'นาทีที่สายสะสม (นาที)': d.lateMinutes,
+      'ออกก่อนเวลา (ครั้ง)': d.earlyOutDays,
+      'ขาดงาน (วัน)': d.absentDays,
+      'ได้เบิกค่าข้าว (+25฿) สุทธิ': d.allowance,
+      'อัตราความตรงเวลา (%)': Number(rate)
     };
   });
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
+  if (typeof XLSX === 'undefined') {
+    alert('ไม่พบไลบรารี SheetJS (XLSX) สำหรับส่งออก');
+    return;
+  }
+
+  const monthText = selectedMonth === 'ALL' ? 'All_Months' : `Month_${selectedMonth}`;
+  const worksheet = XLSX.utils.json_to_sheet(exportRows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Department Late Summary');
-  XLSX.writeFile(workbook, `HR_Department_Late_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Dept_Summary');
+  XLSX.writeFile(workbook, `Department_Attendance_Summary_${monthText}.xlsx`);
 }
 
 /**
- * Export Department Report to Printable PDF Window
+ * Print Department Report to PDF with Monthly Filter support
  */
 function exportDeptReportPDF() {
-  const emps = Object.values(AppState.employeeSummary || {});
+  const monthFilterEl = document.getElementById('dept-report-month-filter');
+  const selectedMonth = monthFilterEl ? monthFilterEl.value : 'ALL';
+  const records = AppState.processedRecords || [];
   const deptMap = {};
 
-  emps.forEach(emp => {
-    const d = emp.dept || 'ไม่ระบุแผนก';
-    if (!deptMap[d]) {
-      deptMap[d] = { deptName: d, empCount: 0, totalDaysWorked: 0, ontimeDays: 0, lateDays: 0, lateMinutes: 0, earlyOutDays: 0, absentDays: 0, allowance: 0, employees: [] };
+  records.forEach(r => {
+    if (selectedMonth !== 'ALL') {
+      const parts = r.dateStr.split('-');
+      if (parts.length >= 2 && parts[1] !== selectedMonth) return;
     }
-    deptMap[d].empCount++;
-    deptMap[d].totalDaysWorked += (emp.totalDaysWorked || 0);
-    deptMap[d].ontimeDays += (emp.ontimeDays || 0);
-    deptMap[d].lateDays += (emp.lateDays || 0);
-    deptMap[d].lateMinutes += (emp.totalLateMinutes || 0);
-    deptMap[d].earlyOutDays += (emp.earlyOutDays || 0);
-    deptMap[d].absentDays += (emp.absentDays || 0);
-    deptMap[d].allowance += (emp.totalAllowance || 0);
-    deptMap[d].employees.push(emp);
+    const d = r.dept || 'ไม่ระบุแผนก';
+    if (!deptMap[d]) {
+      deptMap[d] = { deptName: d, empCount: 0, totalDaysWorked: 0, ontimeDays: 0, lateDays: 0, lateMinutes: 0, earlyOutDays: 0, absentDays: 0, allowance: 0, empMap: {} };
+    }
+    const empKey = r.empId;
+    if (!deptMap[d].empMap[empKey]) {
+      deptMap[d].empMap[empKey] = { empId: r.empId, empName: r.empName, lateDays: 0, totalLateMinutes: 0 };
+    }
+    if (r.clockInSeconds > 0 || r.actualHours > 0 || r.leaveReason) deptMap[d].totalDaysWorked++;
+    if ((r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate) deptMap[d].ontimeDays++;
+    if (r.isLate) { deptMap[d].lateDays++; deptMap[d].lateMinutes += (r.lateMinutes || 0); deptMap[d].empMap[empKey].lateDays++; deptMap[d].empMap[empKey].totalLateMinutes += (r.lateMinutes || 0); }
+    if (r.isEarlyOut) deptMap[d].earlyOutDays++;
+    if (r.isAbsent) deptMap[d].absentDays++;
+    deptMap[d].allowance += (r.allowance || 0);
   });
 
-  const deptList = Object.values(deptMap).sort((a, b) => b.lateDays - a.lateDays);
+  const deptList = Object.values(deptMap).map(d => {
+    d.empCount = Object.keys(d.empMap).length;
+    d.employees = Object.values(d.empMap);
+    return d;
+  }).sort((a, b) => b.lateDays - a.lateDays);
 
-  const printWin = window.open('', '_blank', 'width=1100,height=800');
+  if (deptList.length === 0) {
+    alert('ไม่พบข้อมูลแผนกสำหรับพิมพ์ PDF ในเดือนที่เลือก');
+    return;
+  }
+
+  const totalDepts = deptList.length;
+  const totalWorkedAll = deptList.reduce((sum, d) => sum + d.totalDaysWorked, 0);
+  const totalOntimeAll = deptList.reduce((sum, d) => sum + d.ontimeDays, 0);
+  const totalLateAll = deptList.reduce((sum, d) => sum + d.lateDays, 0);
+  const totalLateMinsAll = deptList.reduce((sum, d) => sum + d.lateMinutes, 0);
+  const avgOntimeRate = totalWorkedAll > 0 ? ((totalOntimeAll / totalWorkedAll) * 100).toFixed(1) : '100.0';
+  const monthText = selectedMonth === 'ALL' ? 'ทุกเดือน (ทั้งหมด)' : `เดือน ${selectedMonth}`;
+
+  const printWin = window.open('', '_blank', 'width=1100,height=850');
   if (!printWin) {
-    alert('กรุณาอนุญาต Pop-up window ในเบราว์เซอร์เพื่อเปิดรายงาน PDF');
+    alert('กรุณาอนุญาต Pop-up window ในเบราว์เซอร์เพื่อแสดงรายงาน PDF');
     return;
   }
 
   let rowsHTML = deptList.map((d, idx) => {
     const rate = d.totalDaysWorked > 0 ? ((d.ontimeDays / d.totalDaysWorked) * 100).toFixed(1) : '100.0';
     const topLate = [...d.employees].sort((a, b) => (b.lateDays || 0) - (a.lateDays || 0)).filter(e => e.lateDays > 0).slice(0, 3);
-    const topLateText = topLate.length > 0 
-      ? topLate.map(e => `${e.empName} (${e.lateDays} วัน/${(e.totalLateMinutes||0)}น.)`).join(', ')
-      : 'ไม่มีผู้มาสาย';
+    const topLateStr = topLate.length > 0 
+      ? topLate.map((e, i) => `${i+1}) ${e.empName} (${e.lateDays} วัน / ${e.totalLateMinutes||0} น.)`).join('<br>')
+      : '<span style="color:#166534; font-weight:bold;">✅ ไม่มีคนมาสาย</span>';
 
     return `
       <tr>
@@ -2905,67 +2975,98 @@ function exportDeptReportPDF() {
         <td style="text-align:center;">${d.totalDaysWorked.toLocaleString()}</td>
         <td style="text-align:center; color:#166534; font-weight:bold;">${d.ontimeDays.toLocaleString()}</td>
         <td style="text-align:center; color:#991b1b; font-weight:bold;">${d.lateDays.toLocaleString()} วัน</td>
-        <td style="text-align:center; color:#991b1b;">${d.lateMinutes.toLocaleString()} น.</td>
+        <td style="text-align:center; color:#991b1b; font-weight:bold;">${d.lateMinutes.toLocaleString()} น.</td>
         <td style="text-align:center;">${d.earlyOutDays.toLocaleString()}</td>
-        <td style="text-align:center;">${d.absentDays.toLocaleString()}</td>
-        <td style="text-align:right; font-weight:bold;">${d.allowance.toLocaleString()} ฿</td>
-        <td style="text-align:center;"><strong>${rate}%</strong></td>
-        <td style="font-size: 8.5pt;">${topLateText}</td>
+        <td style="text-align:center;">${d.absentDays > 0 ? `<strong>${d.absentDays}</strong>` : '0'}</td>
+        <td style="text-align:center; color:#1e40af; font-weight:bold;">${d.allowance.toLocaleString()} ฿</td>
+        <td style="text-align:center; font-weight:bold;">${rate}%</td>
+        <td style="font-size:0.8rem; line-height:1.4;">${topLateStr}</td>
       </tr>
     `;
   }).join('');
 
+  const now = new Date();
+  const printDateStr = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
   printWin.document.write(`
     <!DOCTYPE html>
-    <html>
+    <html lang="th">
     <head>
       <meta charset="UTF-8">
-      <title>Department Punctuality & Late Report - HERRENKNECHT (ASIA) LTD.</title>
+      <title>Department Attendance Report - HERRENKNECHT (ASIA) LTD.</title>
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
-        body { font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 25px; color: #1e293b; }
-        .header { border-bottom: 3px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .header h1 { margin: 0; font-size: 18pt; color: #1d4ed8; }
-        .header p { margin: 4px 0 0 0; font-size: 10pt; color: #64748b; }
-        .table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 30px; }
-        .table th { background: #1e293b; color: #ffffff; padding: 8px 6px; border: 1px solid #1e293b; font-weight: 600; }
-        .table td { padding: 7px 6px; border: 1px solid #cbd5e1; }
-        .table tr:nth-child(even) { background: #f8fafc; }
-        .sig-row { display: flex; justify-content: space-around; margin-top: 50px; page-break-inside: avoid; }
-        .sig-box { text-align: center; width: 220px; font-size: 10pt; }
-        .sig-line { border-bottom: 1px solid #475569; margin-bottom: 8px; height: 35px; }
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+        body { font-family: 'Sarabun', sans-serif; padding: 25px; color: #1e293b; }
+        .header-box { border-bottom: 3px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .company-title { font-size: 20px; font-weight: 700; color: #1e3a8a; margin: 0; }
+        .report-title { font-size: 16px; font-weight: 600; color: #334155; margin: 4px 0 0 0; }
+        .print-info { font-size: 12px; color: #64748b; text-align: right; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .kpi-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; background: #f8fafc; }
+        .kpi-label { font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+        .kpi-val { font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 30px; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px 6px; }
+        th { background: #f1f5f9; color: #334155; font-weight: 700; text-align: center; }
+        tr:nth-child(even) { background: #f8fafc; }
+        .signatures { margin-top: 40px; display: flex; justify-content: space-around; page-break-inside: avoid; }
+        .sig-box { text-align: center; width: 220px; }
+        .sig-line { border-bottom: 1px dashed #64748b; height: 50px; margin-bottom: 8px; }
+        .sig-name { font-size: 13px; font-weight: 600; color: #334155; }
+        .sig-role { font-size: 11px; color: #64748b; }
         @media print {
-          @page { size: A4 landscape; margin: 12mm; }
+          @page { size: A4 landscape; margin: 15mm; }
+          body { padding: 0; }
         }
       </style>
     </head>
     <body>
-      <div class="header">
+      <div class="header-box">
         <div>
-          <h1>HERRENKNECHT (ASIA) LTD.</h1>
-          <p>🏢 รายงานสรุปการมาสายและความตรงเวลาแยกตามแผนก (Department Punctuality & Late Audit Report)</p>
+          <h1 class="company-title">HERRENKNECHT (ASIA) LTD.</h1>
+          <div class="report-title">รายงานสรุปสถิติมาสายและการทำงานแยกตามแผนก (Department Punctuality Report)</div>
+          <div style="font-size:13px; font-weight:600; color:#2563eb; margin-top:3px;">📅 ช่วงเวลา: ${monthText}</div>
         </div>
-        <div style="text-align: right; font-size: 9.5pt; color: #64748b;">
-          <strong>พิมพ์วันที่:</strong> ${new Date().toLocaleDateString('th-TH')}<br>
-          <strong>ข้อมูลช่วงวันที่:</strong> ${document.getElementById('kpi-date-range') ? document.getElementById('kpi-date-range').textContent : '-'}
+        <div class="print-info">
+          วันที่พิมพ์รายงาน: ${printDateStr}<br>
+          ระบบ: HR-Time Workshop Attendance Portal
         </div>
       </div>
 
-      <table class="table">
+      <div class="kpi-grid">
+        <div class="kpi-box" style="border-left: 4px solid #3b82f6;">
+          <div class="kpi-label">จำนวนแผนกทั้งหมด</div>
+          <div class="kpi-val">${totalDepts} แผนก</div>
+        </div>
+        <div class="kpi-box" style="border-left: 4px solid #10b981;">
+          <div class="kpi-label">อัตราความตรงเวลาเฉลี่ย</div>
+          <div class="kpi-val" style="color:#10b981;">${avgOntimeRate}%</div>
+        </div>
+        <div class="kpi-box" style="border-left: 4px solid #ef4444;">
+          <div class="kpi-label">รวมนาทีที่สายทั้งบริษัท</div>
+          <div class="kpi-val" style="color:#ef4444;">${totalLateMinsAll.toLocaleString()} นาที</div>
+        </div>
+        <div class="kpi-box" style="border-left: 4px solid #f59e0b;">
+          <div class="kpi-label">รวมวันทำงานทั้งหมด</div>
+          <div class="kpi-val">${totalWorkedAll.toLocaleString()} วัน-คน</div>
+        </div>
+      </div>
+
+      <table>
         <thead>
           <tr>
-            <th style="width: 40px; text-align:center;">ลำดับ</th>
+            <th style="width: 35px;">ลำดับ</th>
             <th>ชื่อแผนก (Department)</th>
-            <th style="text-align:center;">จำนวนคน</th>
-            <th style="text-align:center;">วันทำงานรวม</th>
-            <th style="text-align:center;">✅ ตรงเวลา</th>
-            <th style="text-align:center;">❌ มาสาย</th>
-            <th style="text-align:center;">⏱️ นาทีสาย</th>
-            <th style="text-align:center;">⚠️ ออกก่อน</th>
-            <th style="text-align:center;">❌ ขาดงาน</th>
-            <th style="text-align:right;">💰 ยอดเบิกค่าข้าว</th>
-            <th style="text-align:center;">🎉 % ตรงเวลา</th>
-            <th>🚨 พนักงานมาสายบ่อยสุดในแผนก</th>
+            <th style="width: 55px;">คน</th>
+            <th style="width: 65px;">วันทำงาน</th>
+            <th style="width: 65px;">ตรงเวลา</th>
+            <th style="width: 65px; background: #fee2e2; color: #991b1b;">มาสาย</th>
+            <th style="width: 75px; background: #fee2e2; color: #991b1b;">นาทีสาย</th>
+            <th style="width: 60px;">ออกก่อน</th>
+            <th style="width: 50px;">ขาด</th>
+            <th style="width: 75px;">ค่าข้าวสุทธิ</th>
+            <th style="width: 60px;">% ตรงเวลา</th>
+            <th>พนักงานที่มาสายบ่อยสุดในแผนก (Top 3)</th>
           </tr>
         </thead>
         <tbody>
@@ -2973,27 +3074,29 @@ function exportDeptReportPDF() {
         </tbody>
       </table>
 
-      <div class="sig-row">
+      <div class="signatures">
         <div class="sig-box">
           <div class="sig-line"></div>
-          <div>ผู้จัดทำรายงาน (Prepared by HR)</div>
-          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+          <div class="sig-name">( ....................................................... )</div>
+          <div class="sig-role">ผู้จัดทำรายงาน / HR Officer</div>
         </div>
         <div class="sig-box">
           <div class="sig-line"></div>
-          <div>ผู้ตรวจสอบ (Reviewed by Manager)</div>
-          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+          <div class="sig-name">( ....................................................... )</div>
+          <div class="sig-role">ผู้จัดการฝ่ายทรัพยากรบุคคล / HR Manager</div>
         </div>
         <div class="sig-box">
           <div class="sig-line"></div>
-          <div>ผู้อนุมัติ (Approved by Director)</div>
-          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+          <div class="sig-name">( ....................................................... )</div>
+          <div class="sig-role">กรรมการผู้จัดการ / Managing Director</div>
         </div>
       </div>
 
       <script>
         window.onload = function() {
-          window.print();
+          setTimeout(function() {
+            window.print();
+          }, 500);
         };
       </script>
     </body>
@@ -3001,10 +3104,6 @@ function exportDeptReportPDF() {
   `);
   printWin.document.close();
 }
-
-/**
- * Export Individual Employee History to Beautiful A4 PDF (Print Preview)
- */
 function exportEmployeeToPDF() {
   if (!AppState.selectedEmployeeForModal) {
     alert('กรุณาเลือกหรือเปิดประวัติพนักงานก่อนทำการ Export PDF');
