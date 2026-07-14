@@ -880,6 +880,50 @@ async function loadDefaultExcel() {
     console.error('Static Excel fallback error:', staticErr);
   }
 
+  // Fallback: Auto-Restore from Supabase Cloud if Excel is missing/cleared
+  try {
+    let cloudRows = [];
+    const srvRes = await fetch('/api/supabase/records');
+    if (srvRes.ok) {
+      const srvData = await srvRes.json();
+      if (srvData.success && Array.isArray(srvData.records) && srvData.records.length > 0) {
+        cloudRows = srvData.records;
+      }
+    }
+    if (cloudRows.length === 0 && typeof supabaseClientREST === 'function') {
+      const restRows = await supabaseClientREST('select', 'attendance_records?limit=15000');
+      if (Array.isArray(restRows) && restRows.length > 0) cloudRows = restRows;
+    }
+
+    if (cloudRows.length > 0) {
+      AppState.headers = ['Date', 'Person ID', 'Person name', 'Department', 'Clock In', 'Clock Out', 'Actual hours', 'DWS code', 'DWS text', 'Leave Reason'];
+      AppState.rawRecords = cloudRows.map(r => [
+        r.work_date || '',
+        String(r.emp_id || ''),
+        String(r.emp_name || ''),
+        String(r.dept_name || 'Workshop'),
+        r.scan_in || '',
+        r.scan_out || '',
+        Number(r.work_hours || 8),
+        r.shift_code || '',
+        r.shift_type || '',
+        r.leave_reason || ''
+      ]);
+      AppState.currentFileName = `☁️ Supabase Cloud Database (${cloudRows.length.toLocaleString()} records)`;
+      const fileDisp = document.getElementById('current-file-display');
+      if (fileDisp) fileDisp.textContent = `📑 ${AppState.currentFileName}`;
+      const statusBadge = document.getElementById('source-status-badge');
+      if (statusBadge) {
+        statusBadge.textContent = '☁️ Cloud Restored';
+        statusBadge.className = 'badge badge-success';
+      }
+      recalculateAndRenderAll();
+      return;
+    }
+  } catch (cloudErr) {
+    console.warn('Could not auto-restore records from Supabase:', cloudErr.message);
+  }
+
   AppState.rawRecords = [];
   AppState.currentFileName = AppState.lang === 'en' ? 'No Data (Ready for Workshop Upload)' : 'ว่างเปล่า (รออัปโหลดไฟล์ Excel ใหม่สำหรับ Workshop)';
   const fileDisp = document.getElementById('current-file-display');

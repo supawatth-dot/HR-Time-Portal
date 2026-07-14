@@ -168,14 +168,28 @@ function parseExcelFile(filePath) {
 
 // API: Get default pre-loaded Excel file data
 app.get('/api/default-excel', (req, res) => {
-  if (!fs.existsSync(DEFAULT_EXCEL_PATH)) {
+  let targetPath = DEFAULT_EXCEL_PATH;
+  if (!fs.existsSync(targetPath)) {
+    const fallbackPaths = [
+      path.join(__dirname, 'public', 'Clock in and out_01.01.26 to 30.06.26.xlsx'),
+      path.join(__dirname, 'Data', 'backup', 'Clock in and out_01.01.26 to 30.06.26.xlsx'),
+      path.join(__dirname, 'Data', 'backup', 'public_Clock in and out_01.01.26 to 30.06.26.xlsx')
+    ];
+    for (const p of fallbackPaths) {
+      if (fs.existsSync(p)) {
+        targetPath = p;
+        break;
+      }
+    }
+  }
+  if (!fs.existsSync(targetPath)) {
     return res.status(404).json({ success: false, message: 'ไม่พบไฟล์ Excel มาตรฐานในระบบ' });
   }
   try {
-    const rawRows = parseExcelFile(DEFAULT_EXCEL_PATH);
+    const rawRows = parseExcelFile(targetPath);
     res.json({
       success: true,
-      filename: 'Clock in and out_01.01.26 to 30.06.26.xlsx',
+      filename: path.basename(targetPath).replace(/^public_/, ''),
       totalRows: rawRows.length - 1,
       headers: rawRows[0],
       rows: rawRows.slice(1)
@@ -244,6 +258,12 @@ app.post('/api/clear', (req, res) => {
 app.get('/api/supabase/status', async (req, res) => {
   const status = await supabaseClient.checkSupabaseConnection();
   res.json(status);
+});
+
+// Get synced attendance records from Supabase Cloud
+app.get('/api/supabase/records', async (req, res) => {
+  const records = await supabaseClient.getAttendanceRecordsFromSupabase();
+  res.json({ success: true, records });
 });
 
 // Sync attendance records to Supabase Cloud

@@ -198,10 +198,26 @@ async function saveHolidaysToSupabase(holidaysArray) {
   }
 }
 
+async function getAttendanceRecordsFromSupabase(limit = 20000) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.from('attendance_records').select('*').limit(limit);
+    if (error) {
+      console.error('getAttendanceRecordsFromSupabase error:', error.message);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('getAttendanceRecordsFromSupabase exception:', err);
+    return [];
+  }
+}
+
 module.exports = {
   supabase,
   checkSupabaseConnection,
   syncAttendanceRecordsToSupabase,
+  getAttendanceRecordsFromSupabase,
   getOverridesFromSupabase,
   saveOverrideToSupabase,
   removeOverrideFromSupabase,
