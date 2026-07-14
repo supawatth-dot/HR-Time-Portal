@@ -75,18 +75,25 @@
           </div>
           <div class="dropzone" id="dropzone">
             <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" hidden>
+            <input type="file" id="shift-file-input" accept=".xlsx, .xls, .csv" hidden>
             <div class="dropzone-content">
               <span class="drop-icon">📊</span>
               <div class="drop-text">
                 <p class="primary-drop-text">คลิกเพื่อเลือกไฟล์ หรือลากไฟล์ <strong>Clock in and out.xlsx</strong> มาวางที่นี่</p>
                 <p class="secondary-drop-text">รองรับข้อมูลจากไฟล์เครื่องรูดบัตร/แตะบัตร (.xlsx, .xls, .csv)</p>
               </div>
-              <button class="btn btn-outline btn-sm" id="btn-trigger-upload">เลือกไฟล์ Excel</button>
+              <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn btn-outline btn-sm" id="btn-trigger-upload">เลือกไฟล์เวลาเข้า-ออก (Clock In/Out)</button>
+                <button class="btn btn-secondary btn-sm" id="btn-trigger-shift-upload" style="background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.4);">🌙 อัปโหลดตารางงานเข้ากะ (Night Shift)</button>
+              </div>
             </div>
           </div>
-          <div class="file-action-row">
-            <span class="current-file-name" id="current-file-display">📑 ไฟล์ปัจจุบัน: Clock in and out_01.01.26 to 30.06.26.xlsx</span>
-            <button class="btn btn-text btn-xs" id="btn-reload-default" title="รีโหลดข้อมูลเริ่มต้น">🔄 โหลดไฟล์บริษัทเริ่มต้น</button>
+          <div class="file-action-row" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <span class="current-file-name" id="current-file-display">📑 ไฟล์ปัจจุบัน: ว่างเปล่า (ล้างข้อมูลแล้ว)</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="btn btn-text btn-xs" id="btn-reload-default" title="รีโหลดข้อมูลเริ่มต้นจากไฟล์สำรอง">🔄 โหลดไฟล์สำรองเริ่มต้น</button>
+              <button class="btn btn-danger btn-xs" id="btn-clear-database" title="ล้างฐานข้อมูลและประวัติการแตะบัตรทั้งหมดในระบบ" style="background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); border-radius: 4px; padding: 4px 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;">🗑️ ล้างฐานข้อมูลทั้งหมด</button>
+            </div>
           </div>
         </div>
 
@@ -244,6 +251,11 @@
             <span class="tab-icon">⚡</span>
             <span>5. จัดการรายการผิดปกติ & คืนสิทธิ์ (+25฿)</span>
             <span class="tab-badge badge-danger" id="tab-dispute-count">0</span>
+          </button>
+          <button class="tab-btn" data-tab="tab-dept-report">
+            <span class="tab-icon">🏢</span>
+            <span>6. สรุปมาสายรายแผนก (Dept Report)</span>
+            <span class="tab-badge badge-danger" id="tab-dept-count">0</span>
           </button>
         </div>
       </div>
@@ -569,7 +581,53 @@
 
     </section>
 
-  </main>
+  
+      <!-- TAB 5: DEPARTMENT LATE & ATTENDANCE REPORT -->
+      <div class="tab-content" id="tab-dept-report">
+        <div class="filter-toolbar" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h3 style="margin: 0; color: var(--text-main); font-size: 1.15rem;">🏢 สรุปสถิติมาสายและการทำงานแยกตามแผนก (Department Punctuality Report)</h3>
+            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+              เปรียบเทียบจำนวนคนมาสาย, วันที่สายสะสม, นาทีที่สายสะสม, อัตราความตรงเวลา (%) และรายชื่อพนักงานที่มาสายบ่อยในแต่ละแผนก
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-outline btn-sm" onclick="exportDeptReportXLSX()">📑 Export สรุปรายแผนก (.xlsx)</button>
+            <button class="btn btn-primary btn-sm" onclick="exportDeptReportPDF()" style="background: linear-gradient(135deg, #10b981, #059669); border:none; font-weight: 600;">📄 พิมพ์รายงานสรุปรายแผนก (PDF)</button>
+          </div>
+        </div>
+
+        <!-- KPI Cards Row for Department Overview -->
+        <div class="dept-summary-cards" id="dept-kpi-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          <!-- Dynamically populated department executive summary cards -->
+        </div>
+
+        <!-- Department Table -->
+        <div class="table-container" style="background: var(--bg-card); border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+          <table class="data-table" id="dept-report-table">
+            <thead>
+              <tr>
+                <th style="width: 50px; text-align: center;">ลำดับ</th>
+                <th>ชื่อแผนก (Department)</th>
+                <th class="text-center">จำนวนคน (คน)</th>
+                <th class="text-center">วันทำงานรวม (วัน)</th>
+                <th class="text-center">✅ ตรงเวลา (วัน)</th>
+                <th class="text-center" style="background: rgba(239, 68, 68, 0.12); color: #ef4444;">❌ มาสาย (วัน)</th>
+                <th class="text-center" style="background: rgba(239, 68, 68, 0.12); color: #ef4444;">⏱️ นาทีสายสะสม</th>
+                <th class="text-center">⚠️ ออกก่อน (วัน)</th>
+                <th class="text-center">❌ ขาดงาน (วัน)</th>
+                <th class="text-center">💰 ยอดเบิกค่าข้าว (฿)</th>
+                <th class="text-center">🎉 % ตรงเวลา</th>
+                <th>🚨 พนักงานที่มาสายบ่อยสุดในแผนก (Top Late Employees)</th>
+              </tr>
+            </thead>
+            <tbody id="dept-report-tbody">
+              <!-- Dynamically populated department rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+</main>
 
   <!-- EMPLOYEE DAILY LOG MODAL -->
   <div class="modal-backdrop" id="emp-modal-backdrop">
@@ -622,8 +680,11 @@
           </table>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary btn-sm" id="btn-export-emp-modal">📄 Export ประวัตินี้ (.xlsx)</button>
+      <div class="modal-footer" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" id="btn-export-emp-modal">📄 Export Excel (.xlsx)</button>
+          <button class="btn btn-accent btn-sm" id="btn-export-emp-pdf" onclick="exportEmployeeToPDF()" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #fff; border: none; font-weight: 600; padding: 0.4rem 0.95rem; display: flex; align-items: center; gap: 6px;">📑 Export ประวัติเป็น PDF (พิมพ์สวยงาม)</button>
+        </div>
         <button class="btn btn-primary btn-sm" id="btn-close-modal-footer">ปิดหน้าต่าง</button>
       </div>
     </div>

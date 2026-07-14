@@ -184,10 +184,32 @@ function setupEventListeners() {
     }
   });
 
+  const shiftFileInput = document.getElementById('shift-file-input');
+  const btnShiftTrigger = document.getElementById('btn-trigger-shift-upload');
+  if (btnShiftTrigger && shiftFileInput) {
+    btnShiftTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      shiftFileInput.click();
+    });
+    shiftFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleShiftFileUpload(e.target.files[0]);
+      }
+    });
+  }
+
   // Reload Default Button
   document.getElementById('btn-reload-default').addEventListener('click', async () => {
     await loadDefaultExcel();
   });
+
+  // Clear Database Button
+  const btnClearDb = document.getElementById('btn-clear-database');
+  if (btnClearDb) {
+    btnClearDb.addEventListener('click', async () => {
+      await clearAllDatabase();
+    });
+  }
 
   // Summary Filters
   document.getElementById('summary-search-input').addEventListener('input', renderSummaryTable);
@@ -322,7 +344,9 @@ function applyLanguage() {
   if (primaryDrop) primaryDrop.innerHTML = isEn ? 'Click to choose file or drag & drop <strong>Clock in and out.xlsx</strong> here' : 'คลิกเพื่อเลือกไฟล์ หรือลากไฟล์ <strong>Clock in and out.xlsx</strong> มาวางที่นี่';
   if (secondaryDrop) secondaryDrop.textContent = isEn ? 'Supports time clock export files (.xlsx, .xls, .csv)' : 'รองรับข้อมูลจากไฟล์เครื่องรูดบัตร/แตะบัตร (.xlsx, .xls, .csv)';
   if (triggerBtn) triggerBtn.textContent = isEn ? 'Choose Excel File' : 'เลือกไฟล์ Excel';
-  if (reloadBtn) reloadBtn.textContent = isEn ? '🔄 Reload Company Default' : '🔄 โหลดไฟล์บริษัทเริ่มต้น';
+  const clearDbBtn = document.getElementById('btn-clear-database');
+  if (reloadBtn) reloadBtn.textContent = isEn ? '🔄 Reload Backup File' : '🔄 โหลดไฟล์สำรองเริ่มต้น';
+  if (clearDbBtn) clearDbBtn.textContent = isEn ? '🗑️ Clear All Database' : '🗑️ ล้างฐานข้อมูลทั้งหมด';
 
   // Rules box
   const rulesH3 = document.querySelector('.rules-box h3');
@@ -706,16 +730,17 @@ async function loadHolidays() {
  * Load Master Shift Schedule from API (/api/shift-master)
  */
 async function loadShiftMasterMap() {
+  AppState.shiftMasterMap = JSON.parse(localStorage.getItem('hr_time_shift_master_v1') || '{}');
   try {
     const response = await fetch('/api/shift-master');
     if (!response.ok) throw new Error('Shift Master API server not responding');
     const result = await response.json();
     if (result.success && result.shiftMap) {
-      AppState.shiftMasterMap = result.shiftMap;
-      console.log('🎯 Loaded Master Shift Schedules:', Object.keys(AppState.shiftMasterMap).length, 'records');
+      AppState.shiftMasterMap = Object.assign({}, AppState.shiftMasterMap, result.shiftMap);
+      console.log('🎯 Loaded Master Shift Schedules from API + LocalStorage:', Object.keys(AppState.shiftMasterMap).length, 'records');
     }
   } catch (err) {
-    console.warn('Could not load shift master data from API /api/shift-master:', err);
+    console.warn('Could not load shift master data from API /api/shift-master, using LocalStorage:', err);
   }
 }
 
@@ -796,6 +821,8 @@ async function loadDefaultExcel() {
     if (!response.ok) throw new Error('API server not available');
     const result = await response.json();
     if (result.success && Array.isArray(result.rows)) {
+      AppState.headers = result.headers || [];
+      AppState.headers = result.headers || [];
       AppState.rawRecords = result.rows;
       AppState.currentFileName = result.filename;
       document.getElementById('current-file-display').textContent = `📑 ไฟล์ปัจจุบัน: ${result.filename} (${result.totalRows.toLocaleString()} รายการ)`;
@@ -805,7 +832,16 @@ async function loadDefaultExcel() {
       recalculateAndRenderAll();
       return;
     } else {
-      tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">❌ ไม่พบข้อมูล: ${result.message || 'โปรดอัปโหลดไฟล์ Excel'}</td></tr>`;
+      AppState.rawRecords = [];
+      AppState.currentFileName = AppState.lang === 'en' ? 'No Data (Ready for Workshop Upload)' : 'ว่างเปล่า (รออัปโหลดไฟล์ Excel ใหม่สำหรับ Workshop)';
+      const fileDisp = document.getElementById('current-file-display');
+      if (fileDisp) fileDisp.textContent = `📑 ${AppState.lang === 'en' ? 'Current File: None (0 records)' : 'ไฟล์ปัจจุบัน: ว่างเปล่า (พร้อมรับไฟล์ใหม่)'}`;
+      const statusBadge = document.getElementById('source-status-badge');
+      if (statusBadge) {
+        statusBadge.textContent = AppState.lang === 'en' ? 'Database Cleared' : 'ล้างฐานข้อมูลแล้ว';
+        statusBadge.className = 'badge badge-warning';
+      }
+      recalculateAndRenderAll();
       return;
     }
   } catch (err) {
@@ -823,6 +859,7 @@ async function loadDefaultExcel() {
       const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true });
       
       if (rawRows && rawRows.length > 1) {
+        AppState.headers = rawRows[0] || [];
         AppState.rawRecords = rawRows.slice(1);
         AppState.currentFileName = 'Clock in and out_01.01.26 to 30.06.26.xlsx';
         document.getElementById('current-file-display').textContent = `📑 ไฟล์ปัจจุบัน: ${AppState.currentFileName} (${AppState.rawRecords.length.toLocaleString()} รายการ)`;
@@ -837,7 +874,58 @@ async function loadDefaultExcel() {
     console.error('Static Excel fallback error:', staticErr);
   }
 
-  tbody.innerHTML = `<tr><td colspan="11" class="text-center text-danger">❌ ไม่พบข้อมูลเริ่มต้น: โปรดคลิก 'เลือกไฟล์ Excel' เพื่ออัปโหลดไฟล์แตะบัตร</td></tr>`;
+  AppState.rawRecords = [];
+  AppState.currentFileName = AppState.lang === 'en' ? 'No Data (Ready for Workshop Upload)' : 'ว่างเปล่า (รออัปโหลดไฟล์ Excel ใหม่สำหรับ Workshop)';
+  const fileDisp = document.getElementById('current-file-display');
+  if (fileDisp) fileDisp.textContent = `📑 ${AppState.lang === 'en' ? 'Current File: None (0 records)' : 'ไฟล์ปัจจุบัน: ว่างเปล่า (พร้อมรับไฟล์ใหม่)'}`;
+  const statusBadge = document.getElementById('source-status-badge');
+  if (statusBadge) {
+    statusBadge.textContent = AppState.lang === 'en' ? 'Database Cleared' : 'ล้างฐานข้อมูลแล้ว';
+    statusBadge.className = 'badge badge-warning';
+  }
+  recalculateAndRenderAll();
+}
+
+/**
+ * Clear all database records and custom rules
+ */
+async function clearAllDatabase() {
+  if (!confirm(AppState.lang === 'en' 
+    ? 'Are you sure you want to clear the entire attendance database and reset all settings?' 
+    : 'ยืนยันการล้างฐานข้อมูลการแตะบัตรและเกณฑ์ทั้งหมดในระบบใช่หรือไม่?\n\n(หลังจากล้างแล้ว คุณสามารถอัปโหลดไฟล์ Excel ใหม่เพื่อคำนวณ Workshop ได้ทันที)')) {
+    return;
+  }
+
+  const tbody = document.getElementById('summary-tbody');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="13" class="text-center loading-cell">⏳ ${AppState.lang === 'en' ? 'Clearing database...' : 'กำลังล้างฐานข้อมูลทั้งหมด...'}</td></tr>`;
+
+  try {
+    await fetch('/api/clear', { method: 'POST' });
+  } catch (e) {
+    console.warn('API /api/clear unreachable, clearing client state only.');
+  }
+
+  AppState.rawRecords = [];
+  AppState.processedRecords = [];
+  AppState.employeeSummary = {};
+  AppState.deptRuleMap = {};
+  AppState.empRuleMap = {};
+  AppState.overrides = {};
+  localStorage.removeItem('hr_time_dept_rules_v1');
+  localStorage.removeItem('hr_time_emp_rules_v1');
+  localStorage.removeItem('hr_time_overrides_v1');
+
+  AppState.currentFileName = AppState.lang === 'en' ? 'No Data (Ready for Workshop Upload)' : 'ว่างเปล่า (รออัปโหลดไฟล์ Excel ใหม่สำหรับ Workshop)';
+  const disp = document.getElementById('current-file-display');
+  if (disp) disp.textContent = `📑 ${AppState.lang === 'en' ? 'Current File: None (0 records)' : 'ไฟล์ปัจจุบัน: ว่างเปล่า (พร้อมรับไฟล์ใหม่)'}`;
+  const badge = document.getElementById('source-status-badge');
+  if (badge) {
+    badge.textContent = AppState.lang === 'en' ? 'Database Cleared' : 'ล้างฐานข้อมูลแล้ว';
+    badge.className = 'badge badge-warning';
+  }
+  updateCustomRulesBadge();
+  recalculateAndRenderAll();
+  alert(AppState.lang === 'en' ? '✅ Database cleared! Please upload your new Excel file for Workshop attendance check.' : '✅ ล้างฐานข้อมูลทั้งหมดเรียบร้อยแล้ว!\nกรุณาอัปโหลดไฟล์ Excel ใหม่เพื่อคำนวณการเข้าออกสายใน Workshop');
 }
 
 /**
@@ -903,6 +991,89 @@ async function handleFileUpload(file) {
 }
 
 /**
+ * Handle Night Shift Schedule File Upload (Client-side SheetJS + LocalStorage/Memory Merge)
+ */
+async function handleShiftFileUpload(file) {
+  if (!window.XLSX) {
+    alert('ระบบกำลังโหลด SheetJS กรุณารอสักครู่แล้วลองใหม่');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      let loadedCount = 0;
+      
+      workbook.SheetNames.forEach(sName => {
+        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sName], { header: 1 });
+        rows.forEach(r => {
+          const dt = r[0];
+          const id = r[1];
+          const inTime = r[3];
+          if (id && id !== 'Emp.ID' && id !== 'Signature:' && id !== 'Name:' && String(id).trim() !== '' && /^\d{3,6}$/.test(String(id).trim())) {
+            let dateStr = null;
+            if (typeof dt === 'number' && !isNaN(dt) && dt > 10000) {
+              const dateObj = new Date(Math.round((dt - 25569) * 86400 * 1000));
+              dateStr = dateObj.toISOString().slice(0, 10);
+            } else if (typeof dt === 'string' && dt.trim()) {
+              const sDt = dt.trim();
+              let m = sDt.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+              if (m) {
+                const p1 = parseInt(m[1], 10);
+                const p2 = parseInt(m[2], 10);
+                let yr = m[3];
+                if (yr.length === 2) yr = '20' + yr;
+                let month = p1 > 12 ? p2 : (p2 > 12 ? p1 : p1);
+                let day = p1 > 12 ? p1 : (p2 > 12 ? p2 : p2);
+                dateStr = yr + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+              }
+            }
+
+            if (dateStr) {
+              const empId = String(id).trim();
+              const sTime = String(inTime || '').trim();
+              let targetSeconds = 59400;
+              let targetOutSeconds = 91800;
+              let targetStr = '16:30 - 01:30';
+              let isNightShift = true;
+
+              if (sTime === '03.30' || sTime === '15.30' || sTime === '15:30' || sTime === '3.30' || sTime === '3:30' || sTime === '03.00' || sTime === '15.00' || sTime === '15:00' || sTime === '3.00' || sTime === '3:00') {
+                targetSeconds = 55800; targetOutSeconds = 88200; targetStr = '15:30 - 00:30'; isNightShift = true;
+              } else if (sTime === '04.30' || sTime === '16.30' || sTime === '16:30' || sTime === '4.30' || sTime === '4:30' || sTime === '04.00' || sTime === '16.00' || sTime === '16:00' || sTime === '4.00' || sTime === '4:00' || sTime === '05.30' || sTime === '17.30' || sTime === '17:30' || sTime === '5.30' || sTime === '5:30') {
+                targetSeconds = 59400; targetOutSeconds = 91800; targetStr = '16:30 - 01:30'; isNightShift = true;
+              } else if (sTime === '08.00' || sTime === '08:00' || sTime === '8.00' || sTime === '8:00') {
+                targetSeconds = 28800; targetOutSeconds = 61200; targetStr = '08:00 - 17:00'; isNightShift = false;
+              } else if (sTime === '07.00' || sTime === '07:00' || sTime === '7.00' || sTime === '7:00') {
+                targetSeconds = 25200; targetOutSeconds = 57600; targetStr = '07:00 - 16:00'; isNightShift = false;
+              }
+
+              const masterData = { empId, date: dateStr, inTime: sTime, targetSeconds, targetOutSeconds, targetStr, isNightShift, normInSecs: targetSeconds };
+              if (!AppState.shiftMasterMap) AppState.shiftMasterMap = {};
+              AppState.shiftMasterMap[empId + '_' + dateStr] = masterData;
+              AppState.shiftMasterMap[parseInt(empId, 10) + '_' + dateStr] = masterData;
+              loadedCount++;
+            }
+          }
+        });
+      });
+
+      if (loadedCount > 0) {
+        localStorage.setItem('hr_time_shift_master_v1', JSON.stringify(AppState.shiftMasterMap));
+        alert(`🌙 อัปโหลดตารางเข้ากะ (Night Shift) จากไฟล์ "${file.name}" เรียบร้อยแล้ว (${loadedCount.toLocaleString()} รายการ)\nระบบกำลังคำนวณข้อมูลการแตะบัตรใหม่เพื่อปรับเวลาเข้างานให้ตรงตามตารางและไม่คิดสายสำหรับพนักงานกะดึก...`);
+        recalculateAndRenderAll();
+      } else {
+        alert('ไม่พบข้อมูลตารางเข้ากะในไฟล์ที่เลือก กรุณาตรวจสอบรูปแบบตารางงาน Night Shift');
+      }
+    } catch (parseErr) {
+      console.error('Shift file parse error:', parseErr);
+      alert('ไม่สามารถอ่านไฟล์ตารางเข้ากะได้ กรุณาตรวจสอบไฟล์');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/**
  * Excel Date Serial to JS Date String (YYYY-MM-DD)
  */
 function excelSerialToDateStr(serial) {
@@ -915,22 +1086,31 @@ function excelSerialToDateStr(serial) {
     if (m) {
       return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
     }
-    // Check DD/MM/YYYY or DD-MM-YYYY (or MM/DD/YYYY if first number > 12)
-    m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    // Check DD/MM/YYYY or DD-MM-YYYY or M/D/YY or DD/MM/YY (supporting 2-digit and 4-digit years)
+    m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
     if (m) {
       const p1 = parseInt(m[1], 10);
       const p2 = parseInt(m[2], 10);
-      const year = m[3];
-      if (p1 > 12 && p2 <= 12) {
-        // First part is definitely Day (>12), second is Month -> DD/MM/YYYY
-        return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
-      } else if (p2 > 12 && p1 <= 12) {
-        // Second part is definitely Day (>12), first is Month -> MM/DD/YYYY
-        return `${year}-${String(p1).padStart(2, '0')}-${String(p2).padStart(2, '0')}`;
-      } else {
-        // Default assuming standard Thai/British DD/MM/YYYY
-        return `${year}-${String(p2).padStart(2, '0')}-${String(p1).padStart(2, '0')}`;
+      let yearStr = m[3];
+      if (yearStr.length === 2) {
+        const yNum = parseInt(yearStr, 10);
+        if (yNum >= 60 && yNum <= 99) yearStr = String(2500 + yNum - 543);
+        else yearStr = '20' + yearStr;
+      } else if (yearStr.length === 4) {
+        const yNum = parseInt(yearStr, 10);
+        if (yNum > 2500) yearStr = String(yNum - 543);
       }
+      let month, day;
+      if (p1 > 12) {
+        day = p1; month = p2;
+      } else if (p2 > 12) {
+        month = p1; day = p2;
+      } else if (s.includes('/') && !s.startsWith('0') && p1 <= 12 && p2 <= 12) {
+        month = p1; day = p2;
+      } else {
+        day = p1; month = p2;
+      }
+      return `${yearStr}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
     const num = parseFloat(s);
     if (!isNaN(num) && num > 10000) serial = num;
@@ -1018,16 +1198,7 @@ function parseTargetSecondsFromDWS(dwsText) {
 function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHoliday, mode, empId, dateStr, dept) {
   const dws = String(dwsText || '').trim().toLowerCase();
   
-  const isWorkshop = dept && String(dept).toLowerCase().includes('workshop');
-  if (isWorkshop) {
-    if (isPreHoliday) {
-      return { targetSeconds: 25200, targetOutSeconds: 57600, targetStr: '07:00-16:00', isNightShift: false, normInSecs: clockInSeconds };
-    } else {
-      return { targetSeconds: 28800, targetOutSeconds: 61200, targetStr: '08:00-17:00', isNightShift: false, normInSecs: clockInSeconds };
-    }
-  }
-  
-  // 0. Check Master Shift Map (from Data/shift) for exact assigned schedule
+  // 0. Check Master Shift Map (from Data/shift or C:\HR night shift schedule) for exact assigned schedule FIRST
   if (empId && dateStr && AppState && AppState.shiftMasterMap) {
     const key1 = `${empId}_${dateStr}`;
     const key2 = `${parseInt(empId, 10)}_${dateStr}`;
@@ -1047,6 +1218,15 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
       };
     }
   }
+
+  const isWorkshop = (dept && String(dept).toLowerCase().includes('workshop')) || mode === 'workshop' || AppState.mode === 'workshop';
+  if (isWorkshop && !dws.includes('15:30') && !dws.includes('16:30') && !dws.includes('night') && mode !== 'night') {
+    if (isPreHoliday) {
+      return { targetSeconds: 25200, targetOutSeconds: 57600, targetStr: '07:00-16:00', isNightShift: false, normInSecs: clockInSeconds };
+    } else {
+      return { targetSeconds: 28800, targetOutSeconds: 61200, targetStr: '08:00-17:00', isNightShift: false, normInSecs: clockInSeconds };
+    }
+  }
   
   // Normalize 12-hour afternoon clock-in if recorded as e.g. 03:30 (12600s) or 04:00 (14400s) when exit is after midnight (00:00 - 06:00)
   let normInSecs = clockInSeconds;
@@ -1063,15 +1243,16 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
     return { targetSeconds: 59400, targetOutSeconds: 91800, targetStr: '16:30-01:30', isNightShift: true, normInSecs };
   }
 
-  // 3. If mode === 'dws' (Office Mode), check-in ceiling is 09:00 (32400s)
-  if (mode === 'dws') {
+  // 3. If Office Role (mode === 'dws' or non-Workshop department), check-in ceiling is 09:00 (32400s)
+  const isOfficeRole = mode === 'dws' || (!isWorkshop && mode !== 'night' && !isNightInterval);
+  if (isOfficeRole) {
     const parseSecs = parseTargetSecondsFromDWS(dwsText);
     if (parseSecs !== null && parseSecs > 32400) {
       const hh = Math.floor(parseSecs / 3600);
       const mm = Math.floor((parseSecs % 3600) / 60);
       return { targetSeconds: parseSecs, targetOutSeconds: parseSecs + 32400, targetStr: `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`, isNightShift: hh >= 14, normInSecs };
     }
-    return { targetSeconds: 32400, targetOutSeconds: 64800, targetStr: '09:00-18:00', isNightShift: false, normInSecs };
+    return { targetSeconds: 32400, targetOutSeconds: 61200, targetStr: '09:00 (Office <8h)', isNightShift: false, normInSecs };
   }
 
   // 4. Check for standard 24h targets in DWS
@@ -1090,6 +1271,92 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
 /**
  * Core Calculation Engine
  */
+/**
+ * Smart Column Mapping Engine
+ * Automatically detects whether the file is 20-column standard export (without DWS columns)
+ * or 22-column extended export (with DWS columns) based on header names and row length.
+ */
+function getColumnIndices(headers, firstRow) {
+  const map = {
+    empId: 0,
+    empName: 1,
+    date: 2,
+    dwsCode: -1,
+    dwsText: -1,
+    clockIn: -1,
+    clockOut: -1,
+    effHours: -1,
+    actHours: -1,
+    ot1: -1,
+    ot15: -1,
+    ot2: -1,
+    ot3: -1,
+    leaveReason: -1,
+    dept: -1
+  };
+
+  if (Array.isArray(headers) && headers.length > 0) {
+    headers.forEach((h, idx) => {
+      const col = String(h || '').trim().toLowerCase();
+      if (col === 'employee id' || col === 'รหัสพนักงาน' || col.includes('emp id')) map.empId = idx;
+      else if (col === 'name' || col === 'ชื่อ-นามสกุล' || col === 'employee name') map.empName = idx;
+      else if (col === 'date' || col === 'วันที่') map.date = idx;
+      else if (col === 'clock-in' || col === 'clock in' || col === 'เข้างาน' || col === 'เวลาเข้า') map.clockIn = idx;
+      else if (col === 'clock-out' || col === 'clock out' || col === 'ออกงาน' || col === 'เวลาออก') map.clockOut = idx;
+      else if (col.includes('dws') && (col.includes('code') || col.includes('รหัส'))) map.dwsCode = idx;
+      else if (col.includes('dws') && (col.includes('text') || col.includes('ตาราง') || col.includes('กะ'))) map.dwsText = idx;
+      else if (col === 'effective working hours' || col.includes('effective')) map.effHours = idx;
+      else if (col === 'actual working hours' || col.includes('actual')) map.actHours = idx;
+      else if (col === 'ot 1.0') map.ot1 = idx;
+      else if (col === 'ot 1.5') map.ot15 = idx;
+      else if (col === 'ot 2.0') map.ot2 = idx;
+      else if (col === 'ot 3.0') map.ot3 = idx;
+      else if (col === 'absence description' || col === 'leave reason' || col.includes('description') || col.includes('หมายเหตุ')) map.leaveReason = idx;
+      else if (col === 'department' || col === 'แผนก' || col === 'หน่วยงาน') map.dept = idx;
+    });
+  }
+
+  // Fallback: If exact header detection didn't find clockIn or dept, detect by row structure/length
+  if (map.clockIn === -1 || map.clockOut === -1) {
+    const is20Cols = (headers && headers.length <= 20) || (firstRow && firstRow.length <= 20);
+    if (is20Cols) {
+      // Standard 20-column Clock in and out export (e.g. C:\HR\Clock in and out_01.01.26 to 30.06.26.xlsx)
+      map.empId = 0;
+      map.empName = 1;
+      map.date = 2;
+      map.clockIn = 3;
+      map.clockOut = 4;
+      map.effHours = 5;
+      map.actHours = 6;
+      map.ot1 = 7;
+      map.ot15 = 8;
+      map.ot2 = 9;
+      map.ot3 = 10;
+      map.leaveReason = 14;
+      map.dept = 19;
+    } else {
+      // Legacy 22+ column export (with DWS at index 3 & 4)
+      map.empId = 0;
+      map.empName = 1;
+      map.date = 2;
+      map.dwsCode = 3;
+      map.dwsText = 4;
+      map.clockIn = 5;
+      map.clockOut = 6;
+      map.effHours = 7;
+      map.actHours = 8;
+      map.ot1 = 9;
+      map.ot15 = 10;
+      map.ot2 = 11;
+      map.ot3 = 12;
+      map.leaveReason = 16;
+      map.dept = 21;
+    }
+  }
+
+  return map;
+}
+
 function recalculateAndRenderAll() {
   buildPreHolidaysMap();
   
@@ -1100,27 +1367,31 @@ function recalculateAndRenderAll() {
   let totalOntimeDays = 0;
   let totalLateDays = 0;
   let totalEarlyOutDays = 0;
+  let totalAbsentDays = 0;
   let totalPreHolidayShifts = 0;
   let minDate = '9999-99-99';
   let maxDate = '0000-00-00';
 
+  const colIdx = getColumnIndices(AppState.headers, AppState.rawRecords[0]);
+
   AppState.rawRecords.forEach((row) => {
-    const empId = String(row[0] || '').trim();
-    const empName = String(row[1] || 'Unknown Employee').trim();
+    const empId = String(row[colIdx.empId] || '').trim();
+    const empName = String(row[colIdx.empName] || 'Unknown Employee').trim();
     if (!empId || empId === '0' || !empName) return;
 
-    const dateStr = excelSerialToDateStr(row[2]);
-    if (!dateStr) return;
+    const dateStr = excelSerialToDateStr(row[colIdx.date]);
+    if (!dateStr || dateStr === 'INVALID_DATE') return;
 
     if (dateStr < minDate) minDate = dateStr;
     if (dateStr > maxDate) maxDate = dateStr;
 
-    const dwsCode = String(row[3] || '').trim();
-    const dwsText = String(row[4] || '').trim();
-    const leaveReason = String(row[16] || '').trim();
-    const clockInInfo = excelSerialToTimeInfo(row[5]);
-    const clockOutInfo = excelSerialToTimeInfo(row[6]);
-    let actualHours = parseFloat(row[8]) || parseFloat(row[7]) || 0;
+    const dwsCode = colIdx.dwsCode !== -1 ? String(row[colIdx.dwsCode] || '').trim() : '';
+    const dwsText = colIdx.dwsText !== -1 ? String(row[colIdx.dwsText] || '').trim() : '';
+    const leaveReason = colIdx.leaveReason !== -1 ? String(row[colIdx.leaveReason] || '').trim() : '';
+    const clockInInfo = excelSerialToTimeInfo(row[colIdx.clockIn]);
+    const clockOutInfo = excelSerialToTimeInfo(row[colIdx.clockOut]);
+    let actualHours = (colIdx.actHours !== -1 && parseFloat(row[colIdx.actHours])) 
+                   || (colIdx.effHours !== -1 && parseFloat(row[colIdx.effHours])) || 0;
     
     if (clockInInfo.seconds > 0 && clockOutInfo.seconds > 0) {
       let diffSecs = clockOutInfo.seconds - clockInInfo.seconds;
@@ -1129,13 +1400,20 @@ function recalculateAndRenderAll() {
       if (calcHours > 5) calcHours -= 1;
       actualHours = calcHours;
     }
-    const ot1 = parseFloat(row[9]) || 0;
-    const ot15 = parseFloat(row[10]) || 0;
-    const ot2 = parseFloat(row[11]) || 0;
-    const ot3 = parseFloat(row[12]) || 0;
+    const ot1 = colIdx.ot1 !== -1 ? (parseFloat(row[colIdx.ot1]) || 0) : 0;
+    const ot15 = colIdx.ot15 !== -1 ? (parseFloat(row[colIdx.ot15]) || 0) : 0;
+    const ot2 = colIdx.ot2 !== -1 ? (parseFloat(row[colIdx.ot2]) || 0) : 0;
+    const ot3 = colIdx.ot3 !== -1 ? (parseFloat(row[colIdx.ot3]) || 0) : 0;
     const totalOT = ot1 + ot15 + ot2 + ot3;
 
-    const dept = String(row[21] || row[20] || 'Workshop').trim() || 'Workshop';
+    let dept = 'Workshop';
+    if (colIdx.dept !== -1 && row[colIdx.dept]) {
+      dept = String(row[colIdx.dept]).trim() || 'Workshop';
+    } else if (row[19]) {
+      dept = String(row[19]).trim() || 'Workshop';
+    } else if (row[21] || row[20]) {
+      dept = String(row[21] || row[20]).trim() || 'Workshop';
+    }
     deptsSet.add(dept);
 
     const dayOfWeek = getDayOfWeekSafe(dateStr);
@@ -1172,18 +1450,33 @@ function recalculateAndRenderAll() {
     let lateMinutes = 0;
     let isEarlyOut = false;
     let earlyOutMinutes = 0;
+    let isAbsent = false;
     let allowance = 0;
     let statusText = AppState.lang === 'en' ? 'Day Off / No Shift' : 'วันหยุด/ไม่เข้างาน';
-    if (leaveReason && clockInInfo.seconds === 0 && actualHours === 0) {
-      statusText = AppState.lang === 'en' ? 'Leave / Absence' : 'ลาหยุด';
+    let anomalyType = null;
+
+    if (clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && actualHours === 0) {
+      const hasLeave = leaveReason && leaveReason !== '-' && leaveReason !== '0' && leaveReason.trim() !== '';
+      const isWorkDay = (dayOfWeek !== 0 && dayOfWeek !== 6 && dwsText !== 'OFF' && dwsText !== 'วันหยุด') 
+                     || (dwsText && dwsText !== 'OFF' && dwsText !== 'วันหยุด' && dwsText !== '-' && dwsText !== '');
+      
+      if (hasLeave) {
+        statusText = AppState.lang === 'en' ? `Leave: ${leaveReason}` : `ลาหยุด: ${leaveReason}`;
+      } else if (isWorkDay) {
+        // หากไม่มีเวลาเข้าออก ให้เช็คว่า มีการลาไหม ไม่งั้นให้ตีว่าขาดงาน (Absent without leave)
+        isAbsent = true;
+        totalAbsentDays++;
+        statusText = AppState.lang === 'en' ? '❌ Absent (No Leave/Stamp)' : '❌ ขาดงาน (ไม่พบข้อมูลลา/แตะบัตร)';
+        anomalyType = 'ABSENT';
+      }
+    } else if (clockInInfo.seconds === 0 && clockOutInfo.seconds > 0) {
+      anomalyType = 'MISSING_IN';
+    } else if (clockInInfo.seconds > 0 && clockOutInfo.seconds === 0) {
+      anomalyType = 'MISSING_OUT';
     }
 
-    let anomalyType = null;
-    if (clockInInfo.seconds === 0 && clockOutInfo.seconds > 0) anomalyType = 'MISSING_IN';
-    else if (clockInInfo.seconds > 0 && clockOutInfo.seconds === 0) anomalyType = 'MISSING_OUT';
-    else if (clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && !leaveReason && dayOfWeek !== 0 && dayOfWeek !== 6) anomalyType = 'ZERO_STAMP';
-
-    const isWorkshop = dept.toLowerCase().includes('workshop');
+    const isWorkshop = dept.toLowerCase().includes('workshop') || effectiveMode === 'workshop' || AppState.mode === 'workshop';
+    const isOfficeRole = !isWorkshop || effectiveMode === 'dws' || /office|account|sales|hr|purchas|admin/i.test(dept);
     const isClockIn1200 = clockInInfo.seconds === 43200 || clockInInfo.str.startsWith('12:00');
 
     if (clockInInfo.seconds > 0 || actualHours > 0 || clockOutInfo.seconds > 0) {
@@ -1196,7 +1489,47 @@ function recalculateAndRenderAll() {
         allowance = 0;
         statusText = AppState.lang === 'en' ? '✅ On Time (Clock In 12:00)' : '✅ ไม่คิดสาย/ออกก่อน (เข้า 12:00)';
         totalOntimeDays++;
+      } else if (isOfficeRole && !shiftInfo.isMasterOverride && !isNightShift) {
+        // 🏢 OFFICE LOGIC:
+        // 1. "ในส่วนของ office ดูแค่ ใครมาหลัง 09:00" -> Late only if clockInInfo.seconds > 32400 (09:00:00)
+        if (clockInInfo.seconds > 32400 && clockInInfo.seconds > 0) {
+          isLate = true;
+          lateMinutes = Math.ceil((clockInInfo.seconds - 32400) / 60);
+          allowance = 0;
+          statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m (>09:00)` : `❌ สาย ${lateMinutes} นาที (หลัง 09:00)`;
+          totalLateDays++;
+          if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
+        } else {
+          isLate = false;
+          lateMinutes = 0;
+          allowance = 0;
+          if (leaveReason) {
+            statusText = AppState.lang === 'en' ? `🏖️ Leave (${leaveReason})` : `🏖️ ลา (${leaveReason})`;
+          } else if (dayOfWeek === 0 || dayOfWeek === 6) {
+            statusText = AppState.lang === 'en' ? '✅ On Time (Weekend)' : '✅ ตรงเวลา (วันหยุด)';
+          } else {
+            statusText = AppState.lang === 'en' ? '✅ On Time (<=09:00)' : '✅ ตรงเวลา (ไม่เกิน 09:00)';
+          }
+          totalOntimeDays++;
+        }
+
+        // 2. "ส่วนการออกก่อนเวลาให้คำนวณจาก ชมว่าถ้าไม่ครบ 8-ชั่วโมง"
+        if ((clockInInfo.seconds > 0 || normOutSecs > 0) && actualHours > 0 && actualHours < 8.0 && !leaveReason) {
+          isEarlyOut = true;
+          earlyOutMinutes = Math.ceil((8.0 - actualHours) * 60);
+          allowance = 0;
+          totalEarlyOutDays++;
+          if (statusText.includes('✅')) {
+            statusText = AppState.lang === 'en' ? `⚠️ Early Out (-${earlyOutMinutes}m / <8h)` : `⚠️ ออกก่อน (${earlyOutMinutes} นาที / ไม่ครบ 8 ชม.)`;
+          } else {
+            statusText += AppState.lang === 'en' ? ` / Early Out (<8h)` : ` / ออกก่อน (ไม่ครบ 8 ชม.)`;
+          }
+        } else {
+          isEarlyOut = false;
+          earlyOutMinutes = 0;
+        }
       } else {
+        // 🔧 WORKSHOP & MASTER SHIFT OVERRIDE LOGIC:
         const allowedCeiling = isWorkshop ? targetSeconds : (targetSeconds + AppState.lateToleranceSec);
         if (clockInInfo.seconds > allowedCeiling && clockInInfo.seconds > 0) {
           isLate = true;
@@ -1221,7 +1554,7 @@ function recalculateAndRenderAll() {
           totalOntimeDays++;
         }
 
-        if (normOutSecs > 0 && targetOutSeconds > 0 && normOutSecs < targetOutSeconds) {
+        if (normOutSecs > 0 && targetOutSeconds > 0 && normOutSecs < targetOutSeconds && !leaveReason) {
           isEarlyOut = true;
           earlyOutMinutes = Math.ceil((targetOutSeconds - normOutSecs) / 60);
           allowance = 0;
@@ -1283,6 +1616,7 @@ function recalculateAndRenderAll() {
       lateMinutes,
       isEarlyOut,
       earlyOutMinutes,
+      isAbsent: isAbsent || false,
       allowance,
       statusText,
       leaveReason,
@@ -1304,6 +1638,7 @@ function recalculateAndRenderAll() {
         ontimeDays: 0,
         lateDays: 0,
         earlyOutDays: 0,
+        absentDays: 0,
         preHolidayShifts: 0,
         totalAllowance: 0,
         totalActualHours: 0,
@@ -1324,8 +1659,12 @@ function recalculateAndRenderAll() {
       empMap[empId].totalOTHours += totalOT;
     }
     
-    if (leaveReason) {
+    if (leaveReason && leaveReason !== '-' && leaveReason !== '0' && leaveReason.trim() !== '') {
       empMap[empId].leaveStats[leaveReason] = (empMap[empId].leaveStats[leaveReason] || 0) + 1;
+    } else if (isAbsent) {
+      const absentLabel = AppState.lang === 'en' ? '❌ Absent without leave' : '❌ ขาดงาน (ไม่พบข้อมูลลา/แตะบัตร)';
+      empMap[empId].leaveStats[absentLabel] = (empMap[empId].leaveStats[absentLabel] || 0) + 1;
+      empMap[empId].absentDays = (empMap[empId].absentDays || 0) + 1;
     }
     
     empMap[empId].records.push(record);
@@ -1446,7 +1785,7 @@ function renderSummaryTable() {
       <td class="text-center"><span class="badge badge-accent">${emp.preHolidayShifts}</span></td>
       <td class="text-left" style="font-size:0.8rem; line-height:1.2;">
         ${Object.keys(emp.leaveStats).length > 0 
-          ? Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap;">- ${reason}: <b>${count}</b> วัน</div>`).join('') 
+          ? Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap; ${reason.includes('❌') ? 'color:#ef4444; font-weight:bold;' : ''}">- ${reason}: <b>${count}</b> วัน</div>`).join('') 
           : '<div class="text-center text-muted">-</div>'}
       </td>
       <td class="text-right highlight-col font-bold ${emp.earlyOutDays > 0 ? 'text-warning' : ''}">${emp.earlyOutDays || 0} ครั้ง</td>
@@ -1525,7 +1864,8 @@ function renderDailyTable() {
 
   const html = pageRecords.map(r => {
     let statusClass = 'badge-secondary';
-    if (r.isLate || r.isEarlyOut) statusClass = 'badge-danger';
+    if (r.isAbsent) statusClass = 'badge-danger';
+    else if (r.isLate || r.isEarlyOut) statusClass = 'badge-danger';
     else if (r.clockInSeconds > 0 || r.actualHours > 0) statusClass = 'badge-success';
 
     let allowanceHtml = `<span class="text-muted">-</span>`;
@@ -1956,12 +2296,12 @@ function toggleSelectAllDisputes(sourceChk) {
  * Export Exception & Dispute List to Excel
  */
 function exportDisputeXLSX() {
-  const records = AppState.processedRecords.filter(r => r.anomalyType || r.isOverridden || r.isLate).map(r => ({
+  const records = AppState.processedRecords.filter(r => r.anomalyType || r.isOverridden || r.isLate || r.isAbsent).map(r => ({
     'วันที่ (Date)': r.dateStr,
     'รหัสพนักงาน (ID)': r.empId,
     'ชื่อ-นามสกุล (Name)': r.empName,
     'แผนก (Dept)': r.dept,
-    'ประเภทความผิดปกติ (Anomaly Type)': r.anomalyType || (r.isLate ? 'LATE' : 'NORMAL'),
+    'ประเภทความผิดปกติ (Anomaly Type)': r.anomalyType || (r.isAbsent ? 'ABSENT (ขาดงาน)' : (r.isLate ? 'LATE' : 'NORMAL')),
     'เวลาเข้า (Clock In)': r.clockInStr,
     'เวลาออก (Clock Out)': r.clockOutStr,
     'สถานะการอนุมัติ (Status)': r.isOverridden ? 'อนุมัติคืนสิทธิ์ +25฿' : 'ยังไม่อนุมัติ (0฿)',
@@ -2175,7 +2515,8 @@ function openEmployeeModal(empId, selectedMonth = 'ALL') {
     else if (r.clockInSeconds > 0 || r.actualHours > 0) statusClass = 'badge-success';
 
     let allowanceText = '-';
-    if (r.isLate && r.isEarlyOut) allowanceText = `<span class="badge badge-danger">⚠️ สาย ${r.lateMinutes}น. + ออกก่อน ${r.earlyOutMinutes}น.</span>`;
+    if (r.isAbsent) allowanceText = `<span class="badge badge-danger">❌ ขาดงาน (Absent)</span>`;
+    else if (r.isLate && r.isEarlyOut) allowanceText = `<span class="badge badge-danger">⚠️ สาย ${r.lateMinutes}น. + ออกก่อน ${r.earlyOutMinutes}น.</span>`;
     else if (r.isLate) allowanceText = `<span class="badge badge-danger">❌ สาย ${r.lateMinutes} นาที</span>`;
     else if (r.isEarlyOut) allowanceText = `<span class="badge badge-warning">⚠️ ออกก่อน ${r.earlyOutMinutes} นาที</span>`;
     else if (r.clockInSeconds > 0 || r.actualHours > 0) allowanceText = `<span class="badge badge-success">✅ ตรงเวลา</span>`;
@@ -2255,6 +2596,7 @@ function exportSummaryXLSX() {
     'วันทำงานรวม (Worked Days)': e.totalDaysWorked,
     'ตรงเวลา (On-time Days)': e.ontimeDays,
     'มาสาย (Late Days)': e.lateDays,
+    'ขาดงาน (Absent Days)': e.absentDays || 0,
     'กะ 07:00 (Fri/Pre-Holiday Days)': e.preHolidayShifts,
     'ยอดเบิกค่าข้าววันละ 25 บาท (Food Allowance Baht)': e.totalAllowance,
     'ชั่วโมงทำงานจริงรวม (Total Actual Hours)': e.totalActualHours,
@@ -2284,7 +2626,8 @@ function exportDailyXLSX() {
     'เวลาออกจริง (Clock-Out)': r.clockOutStr,
     'ชั่วโมงทำงาน (Actual Hours)': r.actualHours,
     'OT รวม (OT Hours)': r.totalOT,
-    'สถานะสาย (Late Status)': r.isLate ? `สาย ${r.lateMinutes} นาที` : 'ตรงเวลา',
+    'สถานะสาย (Late Status)': r.isAbsent ? 'ขาดงาน (Absent)' : (r.isLate ? `สาย ${r.lateMinutes} นาที` : 'ตรงเวลา'),
+    'เหตุผลการลา/ขาดงาน (Leave/Absent Reason)': r.isAbsent ? 'ขาดงาน (ไม่พบข้อมูลลา/แตะบัตร)' : (r.leaveReason || '-'),
     'ค่าข้าวที่ได้รับ 25฿ (Allowance Baht)': r.allowance
   }));
 
@@ -2358,3 +2701,472 @@ window.saveManualTimeOverride = saveManualTimeOverride;
 window.bulkApproveSelected = bulkApproveSelected;
 window.toggleSelectAllDisputes = toggleSelectAllDisputes;
 window.exportDisputeXLSX = exportDisputeXLSX;
+
+/**
+ * Render Department Punctuality & Late Report Table (Tab 6)
+ */
+function renderDeptReportTable() {
+  const tbody = document.getElementById('dept-report-tbody');
+  const cardsContainer = document.getElementById('dept-kpi-cards');
+  const badgeEl = document.getElementById('tab-dept-count');
+  
+  if (!tbody || !cardsContainer) return;
+
+  const emps = Object.values(AppState.employeeSummary || {});
+  const deptMap = {};
+
+  emps.forEach(emp => {
+    const d = emp.dept || 'ไม่ระบุแผนก';
+    if (!deptMap[d]) {
+      deptMap[d] = {
+        deptName: d,
+        empCount: 0,
+        totalDaysWorked: 0,
+        ontimeDays: 0,
+        lateDays: 0,
+        lateMinutes: 0,
+        earlyOutDays: 0,
+        absentDays: 0,
+        allowance: 0,
+        employees: []
+      };
+    }
+    deptMap[d].empCount++;
+    deptMap[d].totalDaysWorked += (emp.totalDaysWorked || 0);
+    deptMap[d].ontimeDays += (emp.ontimeDays || 0);
+    deptMap[d].lateDays += (emp.lateDays || 0);
+    deptMap[d].lateMinutes += (emp.totalLateMinutes || 0);
+    deptMap[d].earlyOutDays += (emp.earlyOutDays || 0);
+    deptMap[d].absentDays += (emp.absentDays || 0);
+    deptMap[d].allowance += (emp.totalAllowance || 0);
+    deptMap[d].employees.push(emp);
+  });
+
+  const deptList = Object.values(deptMap).sort((a, b) => b.lateDays - a.lateDays);
+  if (badgeEl) badgeEl.textContent = deptList.length;
+
+  // Compute Overall KPI Stats across all departments
+  const totalDepts = deptList.length;
+  const totalWorkedAll = deptList.reduce((sum, d) => sum + d.totalDaysWorked, 0);
+  const totalOntimeAll = deptList.reduce((sum, d) => sum + d.ontimeDays, 0);
+  const totalLateAll = deptList.reduce((sum, d) => sum + d.lateDays, 0);
+  const totalLateMinsAll = deptList.reduce((sum, d) => sum + d.lateMinutes, 0);
+  const avgOntimeRate = totalWorkedAll > 0 ? ((totalOntimeAll / totalWorkedAll) * 100).toFixed(1) : '100.0';
+  const mostLateDept = deptList.length > 0 ? deptList[0] : null;
+
+  // Render Summary Cards
+  cardsContainer.innerHTML = `
+    <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #3b82f6; background: var(--bg-card);">
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🏢 จำนวนแผนกทั้งหมด</div>
+      <div style="font-size: 1.8rem; font-weight: bold; color: var(--text-main); margin: 6px 0;">${totalDepts} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">แผนก</span></div>
+      <div style="font-size: 0.78rem; color: var(--text-muted);">พนักงานรวม ${emps.length.toLocaleString()} คน</div>
+    </div>
+    <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #10b981; background: var(--bg-card);">
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🎉 อัตราความตรงเวลาเฉลี่ย</div>
+      <div style="font-size: 1.8rem; font-weight: bold; color: #10b981; margin: 6px 0;">${avgOntimeRate}%</div>
+      <div style="font-size: 0.78rem; color: var(--text-muted);">ตรงเวลา ${totalOntimeAll.toLocaleString()} จาก ${totalWorkedAll.toLocaleString()} วัน</div>
+    </div>
+    <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #ef4444; background: var(--bg-card);">
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">🚨 แผนกที่มาสายมากที่สุด</div>
+      <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444; margin: 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mostLateDept ? mostLateDept.deptName : '-'}</div>
+      <div style="font-size: 0.78rem; color: #ef4444;">มาสายสะสม ${mostLateDept ? mostLateDept.lateDays.toLocaleString() : 0} วัน (${mostLateDept ? mostLateDept.lateMinutes.toLocaleString() : 0} นาที)</div>
+    </div>
+    <div class="control-box" style="padding: 1.2rem; border-left: 4px solid #f59e0b; background: var(--bg-card);">
+      <div style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">⏱️ เวลามารวมสายทั้งบริษัท</div>
+      <div style="font-size: 1.8rem; font-weight: bold; color: #f59e0b; margin: 6px 0;">${totalLateMinsAll.toLocaleString()} <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">นาที</span></div>
+      <div style="font-size: 0.78rem; color: var(--text-muted);">คิดเป็น ${(totalLateMinsAll / 60).toFixed(1)} ชั่วโมงทำงาน</div>
+    </div>
+  `;
+
+  if (deptList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted" style="padding: 2rem;">ไม่พบข้อมูลแผนก</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = deptList.map((d, idx) => {
+    const rate = d.totalDaysWorked > 0 ? ((d.ontimeDays / d.totalDaysWorked) * 100).toFixed(1) : '100.0';
+    let rateClass = 'badge-success';
+    if (parseFloat(rate) < 90) rateClass = 'badge-danger';
+    else if (parseFloat(rate) < 95) rateClass = 'badge-warning';
+
+    // Sort employees by late days descending and take top 3
+    const topLate = [...d.employees].sort((a, b) => (b.lateDays || 0) - (a.lateDays || 0)).filter(e => e.lateDays > 0).slice(0, 3);
+    const topLateHTML = topLate.length > 0 
+      ? topLate.map((e, i) => `<div style="font-size: 0.82rem; margin-bottom: 3px;"><strong>#${i+1} ${e.empName}</strong> <span style="color: #ef4444; font-weight: 600;">(${e.lateDays} วัน / ${(e.totalLateMinutes||0)}น.)</span></div>`).join('')
+      : '<span style="color: #10b981; font-size: 0.82rem;">✅ ไม่มีพนักงานมาสาย</span>';
+
+    return `
+      <tr>
+        <td class="text-center"><strong>${idx + 1}</strong></td>
+        <td><strong>🏢 ${d.deptName}</strong></td>
+        <td class="text-center">${d.empCount}</td>
+        <td class="text-center">${d.totalDaysWorked.toLocaleString()}</td>
+        <td class="text-center" style="color: #10b981; font-weight: 600;">${d.ontimeDays.toLocaleString()}</td>
+        <td class="text-center"><span class="badge badge-danger" style="font-size: 0.85rem;">${d.lateDays.toLocaleString()} วัน</span></td>
+        <td class="text-center" style="color: #ef4444; font-weight: bold;">${d.lateMinutes.toLocaleString()}น.</td>
+        <td class="text-center">${d.earlyOutDays.toLocaleString()}</td>
+        <td class="text-center">${d.absentDays > 0 ? `<span style="color: #ef4444; font-weight: bold;">${d.absentDays}</span>` : '0'}</td>
+        <td class="text-center" style="color: var(--accent-color); font-weight: bold;">${d.allowance.toLocaleString()} ฿</td>
+        <td class="text-center"><span class="badge ${rateClass}" style="font-size: 0.85rem;">${rate}%</span></td>
+        <td style="padding: 8px 10px;">${topLateHTML}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/**
+ * Export Department Report to Excel (.xlsx)
+ */
+function exportDeptReportXLSX() {
+  const emps = Object.values(AppState.employeeSummary || {});
+  const deptMap = {};
+
+  emps.forEach(emp => {
+    const d = emp.dept || 'ไม่ระบุแผนก';
+    if (!deptMap[d]) {
+      deptMap[d] = { deptName: d, empCount: 0, totalDaysWorked: 0, ontimeDays: 0, lateDays: 0, lateMinutes: 0, earlyOutDays: 0, absentDays: 0, allowance: 0 };
+    }
+    deptMap[d].empCount++;
+    deptMap[d].totalDaysWorked += (emp.totalDaysWorked || 0);
+    deptMap[d].ontimeDays += (emp.ontimeDays || 0);
+    deptMap[d].lateDays += (emp.lateDays || 0);
+    deptMap[d].lateMinutes += (emp.totalLateMinutes || 0);
+    deptMap[d].earlyOutDays += (emp.earlyOutDays || 0);
+    deptMap[d].absentDays += (emp.absentDays || 0);
+    deptMap[d].allowance += (emp.totalAllowance || 0);
+  });
+
+  const data = Object.values(deptMap).sort((a, b) => b.lateDays - a.lateDays).map((d, idx) => {
+    const rate = d.totalDaysWorked > 0 ? ((d.ontimeDays / d.totalDaysWorked) * 100).toFixed(1) + '%' : '100.0%';
+    return {
+      'ลำดับ (No.)': idx + 1,
+      'ชื่อแผนก (Department)': d.deptName,
+      'จำนวนพนักงาน (Employees)': d.empCount,
+      'วันทำงานรวม (Worked Days)': d.totalDaysWorked,
+      'ตรงเวลา (On-time Days)': d.ontimeDays,
+      'มาสายรวม (Late Days)': d.lateDays,
+      'นาทีสายสะสม (Late Minutes)': d.lateMinutes,
+      'ออกก่อนเวลา (Early Out Days)': d.earlyOutDays,
+      'ขาดงาน (Absent Days)': d.absentDays,
+      'ยอดเบิกค่าข้าว (Allowance Baht)': d.allowance,
+      'อัตราตรงเวลา (Punctuality Rate)': rate
+    };
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Department Late Summary');
+  XLSX.writeFile(workbook, `HR_Department_Late_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+/**
+ * Export Department Report to Printable PDF Window
+ */
+function exportDeptReportPDF() {
+  const emps = Object.values(AppState.employeeSummary || {});
+  const deptMap = {};
+
+  emps.forEach(emp => {
+    const d = emp.dept || 'ไม่ระบุแผนก';
+    if (!deptMap[d]) {
+      deptMap[d] = { deptName: d, empCount: 0, totalDaysWorked: 0, ontimeDays: 0, lateDays: 0, lateMinutes: 0, earlyOutDays: 0, absentDays: 0, allowance: 0, employees: [] };
+    }
+    deptMap[d].empCount++;
+    deptMap[d].totalDaysWorked += (emp.totalDaysWorked || 0);
+    deptMap[d].ontimeDays += (emp.ontimeDays || 0);
+    deptMap[d].lateDays += (emp.lateDays || 0);
+    deptMap[d].lateMinutes += (emp.totalLateMinutes || 0);
+    deptMap[d].earlyOutDays += (emp.earlyOutDays || 0);
+    deptMap[d].absentDays += (emp.absentDays || 0);
+    deptMap[d].allowance += (emp.totalAllowance || 0);
+    deptMap[d].employees.push(emp);
+  });
+
+  const deptList = Object.values(deptMap).sort((a, b) => b.lateDays - a.lateDays);
+
+  const printWin = window.open('', '_blank', 'width=1100,height=800');
+  if (!printWin) {
+    alert('กรุณาอนุญาต Pop-up window ในเบราว์เซอร์เพื่อเปิดรายงาน PDF');
+    return;
+  }
+
+  let rowsHTML = deptList.map((d, idx) => {
+    const rate = d.totalDaysWorked > 0 ? ((d.ontimeDays / d.totalDaysWorked) * 100).toFixed(1) : '100.0';
+    const topLate = [...d.employees].sort((a, b) => (b.lateDays || 0) - (a.lateDays || 0)).filter(e => e.lateDays > 0).slice(0, 3);
+    const topLateText = topLate.length > 0 
+      ? topLate.map(e => `${e.empName} (${e.lateDays} วัน/${(e.totalLateMinutes||0)}น.)`).join(', ')
+      : 'ไม่มีผู้มาสาย';
+
+    return `
+      <tr>
+        <td style="text-align:center;">${idx + 1}</td>
+        <td><strong>${d.deptName}</strong></td>
+        <td style="text-align:center;">${d.empCount}</td>
+        <td style="text-align:center;">${d.totalDaysWorked.toLocaleString()}</td>
+        <td style="text-align:center; color:#166534; font-weight:bold;">${d.ontimeDays.toLocaleString()}</td>
+        <td style="text-align:center; color:#991b1b; font-weight:bold;">${d.lateDays.toLocaleString()} วัน</td>
+        <td style="text-align:center; color:#991b1b;">${d.lateMinutes.toLocaleString()} น.</td>
+        <td style="text-align:center;">${d.earlyOutDays.toLocaleString()}</td>
+        <td style="text-align:center;">${d.absentDays.toLocaleString()}</td>
+        <td style="text-align:right; font-weight:bold;">${d.allowance.toLocaleString()} ฿</td>
+        <td style="text-align:center;"><strong>${rate}%</strong></td>
+        <td style="font-size: 8.5pt;">${topLateText}</td>
+      </tr>
+    `;
+  }).join('');
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Department Punctuality & Late Report - HERRENKNECHT (ASIA) LTD.</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+        body { font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 25px; color: #1e293b; }
+        .header { border-bottom: 3px solid #1d4ed8; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .header h1 { margin: 0; font-size: 18pt; color: #1d4ed8; }
+        .header p { margin: 4px 0 0 0; font-size: 10pt; color: #64748b; }
+        .table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 30px; }
+        .table th { background: #1e293b; color: #ffffff; padding: 8px 6px; border: 1px solid #1e293b; font-weight: 600; }
+        .table td { padding: 7px 6px; border: 1px solid #cbd5e1; }
+        .table tr:nth-child(even) { background: #f8fafc; }
+        .sig-row { display: flex; justify-content: space-around; margin-top: 50px; page-break-inside: avoid; }
+        .sig-box { text-align: center; width: 220px; font-size: 10pt; }
+        .sig-line { border-bottom: 1px solid #475569; margin-bottom: 8px; height: 35px; }
+        @media print {
+          @page { size: A4 landscape; margin: 12mm; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h1>HERRENKNECHT (ASIA) LTD.</h1>
+          <p>🏢 รายงานสรุปการมาสายและความตรงเวลาแยกตามแผนก (Department Punctuality & Late Audit Report)</p>
+        </div>
+        <div style="text-align: right; font-size: 9.5pt; color: #64748b;">
+          <strong>พิมพ์วันที่:</strong> ${new Date().toLocaleDateString('th-TH')}<br>
+          <strong>ข้อมูลช่วงวันที่:</strong> ${document.getElementById('kpi-date-range') ? document.getElementById('kpi-date-range').textContent : '-'}
+        </div>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 40px; text-align:center;">ลำดับ</th>
+            <th>ชื่อแผนก (Department)</th>
+            <th style="text-align:center;">จำนวนคน</th>
+            <th style="text-align:center;">วันทำงานรวม</th>
+            <th style="text-align:center;">✅ ตรงเวลา</th>
+            <th style="text-align:center;">❌ มาสาย</th>
+            <th style="text-align:center;">⏱️ นาทีสาย</th>
+            <th style="text-align:center;">⚠️ ออกก่อน</th>
+            <th style="text-align:center;">❌ ขาดงาน</th>
+            <th style="text-align:right;">💰 ยอดเบิกค่าข้าว</th>
+            <th style="text-align:center;">🎉 % ตรงเวลา</th>
+            <th>🚨 พนักงานมาสายบ่อยสุดในแผนก</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHTML}
+        </tbody>
+      </table>
+
+      <div class="sig-row">
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <div>ผู้จัดทำรายงาน (Prepared by HR)</div>
+          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+        </div>
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <div>ผู้ตรวจสอบ (Reviewed by Manager)</div>
+          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+        </div>
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <div>ผู้อนุมัติ (Approved by Director)</div>
+          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+        </div>
+      </div>
+
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWin.document.close();
+}
+
+/**
+ * Export Individual Employee History to Beautiful A4 PDF (Print Preview)
+ */
+function exportEmployeeToPDF() {
+  if (!AppState.selectedEmployeeForModal) {
+    alert('กรุณาเลือกหรือเปิดประวัติพนักงานก่อนทำการ Export PDF');
+    return;
+  }
+  const empId = AppState.selectedEmployeeForModal;
+  const emp = AppState.employeeSummary[empId];
+  if (!emp) return;
+
+  const filteredRecords = AppState.selectedModalMonth === 'ALL' || !AppState.selectedModalMonth
+    ? emp.records
+    : emp.records.filter(r => r.dateStr.startsWith(AppState.selectedModalMonth));
+
+  const sortedRecords = [...filteredRecords].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
+  // Stats
+  let totalDaysWorked = 0;
+  let ontimeDays = 0;
+  let lateDays = 0;
+  let lateMinutesTotal = 0;
+  let earlyOutDays = 0;
+  let absentDays = 0;
+  let totalAllowance = 0;
+  let totalActualHours = 0;
+
+  sortedRecords.forEach(r => {
+    if (r.clockInSeconds > 0 || r.actualHours > 0 || r.leaveReason) totalDaysWorked++;
+    if ((r.clockInSeconds > 0 || r.actualHours > 0) && !r.isLate) ontimeDays++;
+    if (r.isLate) { lateDays++; lateMinutesTotal += (r.lateMinutes || 0); }
+    if (r.isEarlyOut) earlyOutDays++;
+    if (r.isAbsent) absentDays++;
+    totalAllowance += (r.allowance || 0);
+    totalActualHours += (r.actualHours || 0);
+  });
+
+  const printWin = window.open('', '_blank', 'width=950,height=850');
+  if (!printWin) {
+    alert('กรุณาอนุญาต Pop-up window ในเบราว์เซอร์เพื่อเปิดรายงาน PDF');
+    return;
+  }
+
+  let rowsHTML = sortedRecords.map(r => {
+    let statusBadge = '<span style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-weight:bold;">✅ ตรงเวลา</span>';
+    if (r.isAbsent) statusBadge = '<span style="background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:bold;">❌ ขาดงาน</span>';
+    else if (r.isLate && r.isEarlyOut) statusBadge = `<span style="background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:bold;">⚠️ สาย ${r.lateMinutes}น. + ออกก่อน ${r.earlyOutMinutes}น.</span>`;
+    else if (r.isLate) statusBadge = `<span style="background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:bold;">❌ สาย ${r.lateMinutes} นาที</span>`;
+    else if (r.isEarlyOut) statusBadge = `<span style="background:#fef9c3; color:#854d0e; padding:2px 6px; border-radius:4px; font-weight:bold;">⚠️ ออกก่อน ${r.earlyOutMinutes} นาที</span>`;
+    else if (r.leaveReason) statusBadge = `<span style="background:#e0e7ff; color:#3730a3; padding:2px 6px; border-radius:4px; font-weight:bold;">🏖️ ลา: ${r.leaveReason}</span>`;
+
+    return `
+      <tr>
+        <td style="text-align:center;">${r.dateStr}</td>
+        <td style="text-align:center;">${r.dayNameFull}</td>
+        <td style="text-align:center;">${r.targetTimeStr}</td>
+        <td style="text-align:center; font-weight:bold;">${r.clockInStr}</td>
+        <td style="text-align:center; font-weight:bold;">${r.clockOutStr}</td>
+        <td style="text-align:center;">${r.actualHours.toFixed(1)} ชม.</td>
+        <td style="text-align:center;">${statusBadge}</td>
+        <td style="text-align:right; font-weight:bold; color:${r.allowance > 0 ? '#166534' : '#64748b'};">${r.allowance > 0 ? '+' + r.allowance + ' ฿' : '-'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Individual Attendance Report - ${emp.empName}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+        body { font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 25px; color: #1e293b; background: #fff; }
+        .header { border-bottom: 3px solid #1d4ed8; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .header h1 { margin: 0; font-size: 18pt; color: #1d4ed8; letter-spacing: 0.5px; }
+        .header p { margin: 4px 0 0 0; font-size: 10.5pt; color: #64748b; }
+        .profile-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px 20px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .profile-item { font-size: 10pt; color: #64748b; }
+        .profile-item strong { display: block; font-size: 12.5pt; color: #0f172a; margin-top: 3px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 25px; }
+        .kpi-box { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; text-align: center; background: #fff; }
+        .kpi-box .val { font-size: 15pt; font-weight: bold; color: #1e293b; }
+        .kpi-box .lbl { font-size: 8.5pt; color: #64748b; margin-top: 3px; }
+        .table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 35px; }
+        .table th { background: #1e293b; color: #ffffff; padding: 8px 6px; border: 1px solid #1e293b; font-weight: 600; }
+        .table td { padding: 7px 6px; border: 1px solid #cbd5e1; }
+        .table tr:nth-child(even) { background: #f8fafc; }
+        .sig-row { display: flex; justify-content: space-around; margin-top: 45px; page-break-inside: avoid; }
+        .sig-box { text-align: center; width: 230px; font-size: 10pt; }
+        .sig-line { border-bottom: 1px solid #475569; margin-bottom: 8px; height: 35px; }
+        @media print {
+          @page { size: A4 portrait; margin: 15mm; }
+          body { padding: 0; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div>
+          <h1>HERRENKNECHT (ASIA) LTD.</h1>
+          <p>👤 รายงานประวัติการทำงานและการแตะบัตรรายบุคคล (Employee Attendance & Allowance Report)</p>
+        </div>
+        <div style="text-align: right; font-size: 9.5pt; color: #64748b;">
+          <strong>วันที่พิมพ์:</strong> ${new Date().toLocaleDateString('th-TH')}<br>
+          <strong>เดือนที่แสดง:</strong> ${AppState.selectedModalMonth === 'ALL' || !AppState.selectedModalMonth ? 'ทั้งหมด' : AppState.selectedModalMonth}
+        </div>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-item">รหัสพนักงาน (Emp.ID)<strong>${emp.empId}</strong></div>
+        <div class="profile-item">ชื่อ-นามสกุล (Name - Surname)<strong>${emp.empName}</strong></div>
+        <div class="profile-item">แผนก (Department)<strong>🏢 ${emp.dept}</strong></div>
+        <div class="profile-item">ชั่วโมงทำงานจริงรวม<strong>⏱️ ${totalActualHours.toFixed(1)} ชั่วโมง</strong></div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-box"><div class="val">${totalDaysWorked}</div><div class="lbl">💼 วันทำงานรวม (วัน)</div></div>
+        <div class="kpi-box" style="border-color:#bbf7d0; background:#f0fdf4;"><div class="val" style="color:#166534;">${ontimeDays}</div><div class="lbl">✅ ตรงเวลา (+25฿)</div></div>
+        <div class="kpi-box" style="border-color:#fecaca; background:#fef2f2;"><div class="val" style="color:#991b1b;">${lateDays}</div><div class="lbl">❌ มาสาย (${lateMinutesTotal}น.)</div></div>
+        <div class="kpi-box"><div class="val" style="color:#854d0e;">${earlyOutDays}</div><div class="lbl">⚠️ ออกก่อนเวลา (วัน)</div></div>
+        <div class="kpi-box"><div class="val" style="color:#ef4444;">${absentDays}</div><div class="lbl">❌ ขาดงาน (วัน)</div></div>
+        <div class="kpi-box" style="border-color:#bfdbfe; background:#eff6ff;"><div class="val" style="color:#1d4ed8;">${totalAllowance.toLocaleString()} ฿</div><div class="lbl">💰 ยอดได้ค่าข้าวรวม</div></div>
+      </div>
+
+      <h3 style="font-size: 11pt; color: #0f172a; margin-bottom: 10px; border-left: 4px solid #1d4ed8; padding-left: 8px;">📑 รายละเอียดบันทึกเวลาเข้า-ออกรายวัน (Daily Attendance History)</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 80px; text-align:center;">วันที่</th>
+            <th style="width: 80px; text-align:center;">วันในสัปดาห์</th>
+            <th style="width: 130px; text-align:center;">กะงานที่กำหนด</th>
+            <th style="width: 75px; text-align:center;">เวลาเข้าจริง</th>
+            <th style="width: 75px; text-align:center;">เวลาออกจริง</th>
+            <th style="width: 70px; text-align:center;">ชั่วโมงทำงาน</th>
+            <th style="text-align:center;">สถานะตรงเวลา / สาย / ลา</th>
+            <th style="width: 80px; text-align:right;">ค่าข้าว (฿)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHTML}
+        </tbody>
+      </table>
+
+      <div class="sig-row">
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <div>พนักงานเจ้าของประวัติ (Employee)</div>
+          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+        </div>
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <div>ผู้จัดการฝ่ายทรัพยากรบุคคล (HR Manager)</div>
+          <div style="color: #64748b; font-size: 8.5pt; margin-top: 4px;">วันที่ ______/______/2026</div>
+        </div>
+      </div>
+
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+      </script>
+    </body>
+    </html>
+  `);
+  printWin.document.close();
+}
