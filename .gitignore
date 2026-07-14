@@ -2,3 +2,7 @@ node_modules/
 uploads/
 *.log
 .DS_Store
+# Data files with real employee PII must never be committed
+*.xlsx
+*.pdf
+*.docx
