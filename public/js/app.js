@@ -400,13 +400,13 @@ function applyLanguage() {
   const kpiLabels = document.querySelectorAll('.kpi-label');
   if (kpiLabels[0]) kpiLabels[0].textContent = isEn ? 'Total Employees' : 'พนักงานทั้งหมด (Employees)';
   if (kpiLabels[1]) kpiLabels[1].textContent = isEn ? 'Punch Records' : 'รายการบันทึกเวลา (Punch Records)';
-  if (kpiLabels[2]) kpiLabels[2].textContent = isEn ? 'Total Food Allowance' : 'ยอดเบิกค่าข้าวรวม (Total Allowance)';
+  if (kpiLabels[2]) kpiLabels[2].textContent = isEn ? 'Workshop Food Allowance (>=8h)' : 'ค่าข้าว Workshop (฿25 เมื่อครบ 8 ชม.)';
   if (kpiLabels[3]) kpiLabels[3].textContent = isEn ? 'On-Time vs Late Rate' : 'อัตราเข้าตรงเวลา vs มาสาย';
   if (kpiLabels[4]) kpiLabels[4].textContent = isEn ? 'Fri & Pre-Holiday Shifts (07:00)' : 'กะวันศุกร์และก่อนวันหยุด (07:00 น.)';
 
   // Tabs
   const tabBtns = document.querySelectorAll('.tab-list .tab-btn span:nth-child(2)');
-  if (tabBtns[0]) tabBtns[0].textContent = isEn ? '1. Employee Summary & Allowance' : '1. สรุปรายบุคคล & ยอดเบิกค่าข้าว';
+  if (tabBtns[0]) tabBtns[0].textContent = isEn ? '1. Employee Summary & Allowance' : '1. สรุปรายบุคคล & ยอดเบิกค่าข้าว Workshop';
   if (tabBtns[1]) tabBtns[1].textContent = isEn ? '2. Daily Attendance Logs' : '2. บันทึกเวลาเข้า-ออกงานรายวัน';
   if (tabBtns[2]) tabBtns[2].textContent = isEn ? '3. Holiday & Pre-Holiday Calendar' : '3. ปฏิทินวันหยุด & วันก่อนหยุดบริษัท';
   if (tabBtns[3]) tabBtns[3].textContent = isEn ? '4. Analytics & Insights' : '4. วิเคราะห์สถิติ & อันดับความตรงเวลา';
@@ -425,18 +425,18 @@ function applyLanguage() {
 
   // Summary Table Headers
   const sumThs = document.querySelectorAll('#summary-table thead tr th');
-  if (sumThs.length >= 12) {
-    const enSum = ['ID', 'Employee Name', 'Department', 'Worked Days', 'On Time (Days)', 'Late (Days)', '07:00 Shift (Fri/Pre)', 'Leave (Days)', 'Total Allowance (฿)', 'Actual Hrs', 'Total OT', 'Actions'];
-    const thSum = ['รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'วันทำงานรวม', 'ตรงเวลา (วัน)', 'มาสาย (วัน)', 'กะ 07:00 (ศ/ก่อนหยุด)', 'สรุปการลา', 'ค่าข้าวยอดรวม (฿)', 'ชม. ทำงานจริง', 'ชม. OT', 'จัดการ'];
-    sumThs.forEach((th, idx) => { th.textContent = isEn ? enSum[idx] : thSum[idx]; });
+  if (sumThs.length >= 13) {
+    const enSum = ['ID', 'Employee Name', 'Department', 'Worked Days', 'On Time (Days)', 'Late (Days)', 'Early Out (Days)', '07:00 Shift (Fri/Pre)', 'Leave (Days)', 'Workshop Allowance (฿)', 'Actual Hrs', 'Total OT', 'Actions'];
+    const thSum = ['รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'วันทำงานรวม', 'ตรงเวลา (วัน)', 'มาสาย (วัน)', 'ออกก่อน (วัน)', 'กะ 07:00 (ศ/ก่อนหยุด)', 'สรุปการลา', 'ค่าข้าว Workshop (฿)', 'ชม. ทำงานจริง', 'ชม. OT', 'จัดการ'];
+    sumThs.forEach((th, idx) => { if (enSum[idx]) th.textContent = isEn ? enSum[idx] : thSum[idx]; });
   }
 
   // Daily Table Headers
   const dailyThs = document.querySelectorAll('#daily-table thead tr th');
-  if (dailyThs.length >= 13) {
-    const enDaily = ['Date', 'Day', 'ID', 'Employee Name', 'Department', 'DWS Schedule', 'Clock In', 'Target', 'Clock Out', 'Actual Hrs', 'Total OT', 'Status', 'Allowance'];
-    const thDaily = ['วันที่', 'วันในสัปดาห์', 'รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'กะงาน (DWS)', 'เวลาเข้าจริง', 'เป้าหมายเข้า', 'เวลาออกจริง', 'ชั่วโมง', 'OT รวม', 'สถานะสาย', 'ค่าข้าว'];
-    dailyThs.forEach((th, idx) => { th.textContent = isEn ? enDaily[idx] : thDaily[idx]; });
+  if (dailyThs.length >= 14) {
+    const enDaily = ['Date', 'Day', 'ID', 'Employee Name', 'Department', 'DWS Schedule', 'Clock In', 'Target In', 'Clock Out', 'Target Out', 'Actual Hrs', 'Total OT', 'Status', 'Food Allowance'];
+    const thDaily = ['วันที่', 'วันในสัปดาห์', 'รหัส', 'ชื่อ-นามสกุลพนักงาน', 'แผนก', 'กะงาน (DWS)', 'เวลาเข้าจริง', 'เป้าหมายเข้า', 'เวลาออกจริง', 'เป้าหมายออก', 'ชั่วโมง', 'OT รวม', 'สรุปสถานะ/ออกก่อน', 'ค่าข้าว (฿25)'];
+    dailyThs.forEach((th, idx) => { if (enDaily[idx]) th.textContent = isEn ? enDaily[idx] : thDaily[idx]; });
   }
 
   // Holiday Table & Form Headers
@@ -1584,14 +1584,12 @@ function recalculateAndRenderAll() {
         if (clockInInfo.seconds > allowedCeiling && clockInInfo.seconds > 0) {
           isLate = true;
           lateMinutes = Math.ceil((clockInInfo.seconds - targetSeconds) / 60);
-          allowance = 0;
           statusText = AppState.lang === 'en' ? `❌ Late ${lateMinutes}m` : `❌ สาย ${lateMinutes} นาที`;
           totalLateDays++;
           if (!anomalyType) anomalyType = 'EMERGENCY_LATE';
         } else {
           isLate = false;
           lateMinutes = 0;
-          allowance = 0; // ตัดเรื่องการคิดค่าข้าวออกหมดทุกแผนก
           if (leaveReason) {
             statusText = AppState.lang === 'en' ? `🏖️ Leave (${leaveReason})` : `🏖️ ลา (${leaveReason})`;
           } else if (dayOfWeek === 0 || dayOfWeek === 6) {
@@ -1607,7 +1605,6 @@ function recalculateAndRenderAll() {
         if (normOutSecs > 0 && targetOutSeconds > 0 && normOutSecs < targetOutSeconds && !leaveReason) {
           isEarlyOut = true;
           earlyOutMinutes = Math.ceil((targetOutSeconds - normOutSecs) / 60);
-          allowance = 0;
           totalEarlyOutDays++;
           if (statusText.includes('✅')) {
             statusText = AppState.lang === 'en' ? `⚠️ Early Out (-${earlyOutMinutes}m)` : `⚠️ ออกก่อนเวลา (${earlyOutMinutes} นาที)`;
@@ -1616,6 +1613,15 @@ function recalculateAndRenderAll() {
           }
         }
       }
+    }
+
+    // ==========================================
+    // WORKSHOP FOOD ALLOWANCE ENGINE (฿25/วัน เมื่อทำงานครบ 8 ชม.)
+    // ==========================================
+    if (isWorkshop && actualHours >= 8.0 && !leaveReason && !isAbsent && clockInInfo.seconds > 0) {
+      allowance = 25;
+    } else {
+      allowance = 0;
     }
 
     // Check for In-Portal Override
@@ -1632,7 +1638,9 @@ function recalculateAndRenderAll() {
       lateMinutes = 0;
       isEarlyOut = false;
       earlyOutMinutes = 0;
-      allowance = 0;
+      if (override.allowance === 25 || override.grantFoodAllowance || (isWorkshop && actualHours >= 8.0)) {
+        allowance = 25;
+      }
       statusText = AppState.lang === 'en' ? `💡 Approved Override (Time Adjusted)` : `💡 อนุมัติแก้ไขเวลาเรียบร้อยแล้ว`;
       if (override.correctedIn) clockInInfo.str = override.correctedIn;
       if (override.correctedOut) clockOutInfo.str = override.correctedOut;
@@ -1759,8 +1767,9 @@ function recalculateAndRenderAll() {
   document.getElementById('kpi-date-range').textContent = `${minDate} ถึง ${maxDate}`;
   document.getElementById('print-date-range').textContent = `${minDate} ถึง ${maxDate}`;
   
-  document.getElementById('kpi-total-allowance').innerHTML = `${totalEarlyOutDays.toLocaleString()} <span class="kpi-unit">ครั้ง</span>`;
-  document.getElementById('kpi-ontime-days').textContent = totalOntimeDays.toLocaleString();
+  const totalQualifiedShifts = Math.round(totalAllowanceSum / 25);
+  document.getElementById('kpi-total-allowance').innerHTML = `฿${totalAllowanceSum.toLocaleString()} <span class="kpi-unit">บาท</span>`;
+  document.getElementById('kpi-ontime-days').textContent = `ผ่านเกณฑ์ 8 ชม. รวม ${totalQualifiedShifts.toLocaleString()} วัน/มื้อ (ออกก่อน ${totalEarlyOutDays.toLocaleString()} ครั้ง)`;
   
   document.getElementById('kpi-ontime-rate').innerHTML = `${ontimeRate}% <span class="kpi-unit">ตรงเวลา</span>`;
   document.getElementById('kpi-progress-bar').style.width = `${ontimeRate}%`;
@@ -1841,7 +1850,10 @@ function renderSummaryTable() {
           ? Object.entries(emp.leaveStats).map(([reason, count]) => `<div style="white-space:nowrap; ${reason.includes('❌') ? 'color:#ef4444; font-weight:bold;' : ''}">- ${reason}: <b>${count}</b> วัน</div>`).join('') 
           : '<div class="text-center text-muted">-</div>'}
       </td>
-      <td class="text-right highlight-col font-bold ${emp.earlyOutDays > 0 ? 'text-warning' : ''}">${emp.earlyOutDays || 0} ครั้ง</td>
+      <td class="text-right highlight-col font-bold ${emp.totalAllowance > 0 ? 'text-success' : 'text-muted'}" style="font-size:1rem;">
+        ${emp.totalAllowance > 0 ? '฿' + emp.totalAllowance.toLocaleString() : '-'}
+        ${emp.totalAllowance > 0 ? `<div style="font-size:0.75rem; font-weight:normal; color:#6b7280;">(${emp.totalAllowance / 25} วัน)</div>` : ''}
+      </td>
       <td class="text-center">${emp.totalActualHours.toFixed(1)}</td>
       <td class="text-center">${emp.totalOTHours.toFixed(1)}</td>
       <td class="text-center">
@@ -1922,10 +1934,14 @@ function renderDailyTable() {
     else if (r.clockInSeconds > 0 || r.actualHours > 0) statusClass = 'badge-success';
 
     let allowanceHtml = `<span class="text-muted">-</span>`;
-    if (r.isLate && r.isEarlyOut) allowanceHtml = `<span class="badge badge-danger">⚠️ สาย ${r.lateMinutes}น. + ออกก่อน ${r.earlyOutMinutes}น.</span>`;
-    else if (r.isLate) allowanceHtml = `<span class="badge badge-danger">❌ สาย ${r.lateMinutes} นาที</span>`;
-    else if (r.isEarlyOut) allowanceHtml = `<span class="badge badge-warning">⚠️ ออกก่อน ${r.earlyOutMinutes} นาที</span>`;
-    else if (r.clockInSeconds > 0 || r.actualHours > 0) allowanceHtml = `<span class="badge badge-success">✅ ตรงเวลา</span>`;
+    const isWk = r.dept && (r.dept.toLowerCase().includes('workshop') || AppState.mode === 'workshop');
+    if (r.allowance > 0) {
+      allowanceHtml = `<span class="badge badge-success font-bold" style="background:#10b981; color:#fff; font-size:0.85rem;">🍱 ฿${r.allowance}</span>`;
+    } else if (isWk && r.clockInSeconds > 0 && r.actualHours < 8.0) {
+      allowanceHtml = `<span class="badge badge-warning" title="ไม่ครบ 8 ชม. (${r.actualHours.toFixed(1)} ชม.)" style="font-size:0.75rem;">⏳ ${r.actualHours.toFixed(1)} ชม. (< 8 ชม.)</span>`;
+    } else if (r.isAbsent || r.leaveReason) {
+      allowanceHtml = `<span class="text-muted" style="font-size:0.75rem;">- ไม่ได้สิทธิ์ -</span>`;
+    }
 
     return `
       <tr>
