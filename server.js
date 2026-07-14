@@ -3,6 +3,7 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const supabaseClient = require('./supabaseClient');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -233,6 +234,56 @@ app.post('/api/clear', (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดขณะล้างข้อมูล: ' + err.message });
   }
+});
+
+// ==========================================
+// SUPABASE CLOUD DATABASE API ENDPOINTS
+// ==========================================
+
+// Check Supabase connection status
+app.get('/api/supabase/status', async (req, res) => {
+  const status = await supabaseClient.checkSupabaseConnection();
+  res.json(status);
+});
+
+// Sync attendance records to Supabase Cloud
+app.post('/api/supabase/sync', async (req, res) => {
+  const { records, batchUploadId } = req.body;
+  const result = await supabaseClient.syncAttendanceRecordsToSupabase(records, batchUploadId);
+  res.json(result);
+});
+
+// Get HR Overrides from Supabase Cloud
+app.get('/api/supabase/overrides', async (req, res) => {
+  const overrides = await supabaseClient.getOverridesFromSupabase();
+  res.json({ success: true, overrides });
+});
+
+// Save HR Override to Supabase Cloud
+app.post('/api/supabase/overrides', async (req, res) => {
+  const { empId, workDate, overrideData } = req.body;
+  const result = await supabaseClient.saveOverrideToSupabase(empId, workDate, overrideData);
+  res.json(result);
+});
+
+// Delete HR Override from Supabase Cloud
+app.delete('/api/supabase/overrides', async (req, res) => {
+  const { empId, workDate } = req.body;
+  const result = await supabaseClient.removeOverrideFromSupabase(empId, workDate);
+  res.json(result);
+});
+
+// Get Holidays from Supabase Cloud
+app.get('/api/supabase/holidays', async (req, res) => {
+  const holidays = await supabaseClient.getHolidaysFromSupabase();
+  res.json({ success: true, holidays });
+});
+
+// Save Holidays to Supabase Cloud
+app.post('/api/supabase/holidays', async (req, res) => {
+  const { holidays } = req.body;
+  const result = await supabaseClient.saveHolidaysToSupabase(holidays);
+  res.json(result);
 });
 
 const os = require('os');

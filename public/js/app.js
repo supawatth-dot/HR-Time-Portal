@@ -38,6 +38,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadHolidays();
   await loadShiftMasterMap();
   await loadDefaultExcel();
+  if (typeof checkSupabaseStatusUI === 'function') {
+    await checkSupabaseStatusUI();
+    await syncOverridesFromSupabase();
+  }
 });
 
 /**
@@ -3268,4 +3272,90 @@ function exportEmployeeToPDF() {
     </html>
   `);
   printWin.document.close();
+}
+
+// ==========================================
+// SUPABASE CLOUD DATABASE FRONTEND SYNC
+// ==========================================
+
+window.checkSupabaseStatusUI = async function() {
+  const badge = document.getElementById('supabase-status-badge');
+  const syncBtn = document.getElementById('btn-supabase-sync');
+  try {
+    const res = await fetch('/api/supabase/status');
+    const data = await res.json();
+    if (data.connected) {
+      if (badge) {
+        badge.className = 'badge badge-success';
+        badge.style.background = '#10b981';
+        badge.style.color = '#ffffff';
+        badge.textContent = `☁️ Supabase: Connected (${(data.recordCount || 0).toLocaleString()} records)`;
+      }
+      if (syncBtn) syncBtn.style.display = 'inline-block';
+      AppState.isSupabaseConnected = true;
+    } else {
+      if (badge) {
+        badge.className = 'badge badge-info';
+        badge.style.background = '#3b82f6';
+        badge.style.color = '#ffffff';
+        badge.textContent = '💻 Local Mode (Offline/No .env)';
+      }
+      if (syncBtn) syncBtn.style.display = 'none';
+      AppState.isSupabaseConnected = false;
+    }
+  } catch (err) {
+    if (badge) {
+      badge.className = 'badge badge-secondary';
+      badge.textContent = '💻 Local Mode';
+    }
+    if (syncBtn) syncBtn.style.display = 'none';
+  }
+};
+
+window.syncAllToSupabase = async function() {
+  if (!AppState.processedRecords || AppState.processedRecords.length === 0) {
+    alert('ยังไม่มีข้อมูลการเข้า-ออกในตาราง กรุณาอัปโหลดไฟล์ Excel ก่อนกดซิงค์ครับ');
+    return;
+  }
+  const syncBtn = document.getElementById('btn-supabase-sync');
+  const origText = syncBtn ? syncBtn.textContent : '';
+  if (syncBtn) syncBtn.textContent = '⏳ กำลังซิงค์...';
+  
+  try {
+    const res = await fetch('/api/supabase/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        batchUploadId: 'MANUAL_SYNC_' + Date.now(),
+        records: AppState.processedRecords
+      })
+    });
+    const result = await res.json();
+    if (result.success) {
+      alert(`🎉 ซิงค์สำเร็จ! บันทึกข้อมูล ${result.count || AppState.processedRecords.length} รายการลง Supabase Cloud Database ถาวรเรียบร้อยแล้วครับ`);
+      checkSupabaseStatusUI();
+    } else {
+      alert('ไม่สามารถซิงค์ข้อมูลได้: ' + result.message);
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาดขณะเชื่อมต่อเซิร์ฟเวอร์เพื่อซิงค์: ' + err.message);
+  } finally {
+    if (syncBtn) syncBtn.textContent = origText || '☁️ ซิงค์ขึ้น Cloud';
+  }
+};
+
+async function syncOverridesFromSupabase() {
+  try {
+    const res = await fetch('/api/supabase/overrides');
+    const data = await res.json();
+    if (data.success && data.overrides && Object.keys(data.overrides).length > 0) {
+      // Merge Cloud overrides into AppState.overrides
+      Object.assign(AppState.overrides, data.overrides);
+      localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+      recalculateAndRenderAll();
+      console.log('☁️ Loaded & merged Overrides from Supabase Cloud');
+    }
+  } catch (err) {
+    console.warn('Could not pull overrides from Supabase:', err.message);
+  }
 }
