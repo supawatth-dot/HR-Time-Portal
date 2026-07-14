@@ -2210,6 +2210,7 @@ function quickApproveOverride(empId, dateStr, anomalyType, note = 'อนุม�
     timestamp: new Date().toISOString()
   };
   localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  if (typeof syncSingleOverrideToSupabase === 'function') syncSingleOverrideToSupabase(empId, dateStr, AppState.overrides[overrideKey]);
   recalculateAndRenderAll();
   
   // If modal is open for this employee, refresh modal view
@@ -2223,6 +2224,7 @@ function removeOverride(empId, dateStr) {
   const overrideKey = `${empId}_${dateStr}`;
   delete AppState.overrides[overrideKey];
   localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  if (typeof syncSingleOverrideToSupabase === 'function') syncSingleOverrideToSupabase(empId, dateStr, null);
   recalculateAndRenderAll();
   
   if (AppState.selectedEmployeeForModal && AppState.selectedEmployeeForModal.empId === empId) {
@@ -2268,6 +2270,7 @@ function saveManualTimeOverride() {
     timestamp: new Date().toISOString()
   };
   localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+  if (typeof syncSingleOverrideToSupabase === 'function') syncSingleOverrideToSupabase(empId, dateStr, AppState.overrides[overrideKey]);
   closeManualTimeModal();
   recalculateAndRenderAll();
 }
@@ -3275,41 +3278,97 @@ function exportEmployeeToPDF() {
 }
 
 // ==========================================
-// SUPABASE CLOUD DATABASE FRONTEND SYNC
+// SUPABASE CLOUD DATABASE FRONTEND SYNC (HYBRID SERVER / DIRECT REST MODE)
 // ==========================================
+
+// Helper for direct Client-Side REST requests on GitHub Pages or static host
+async function supabaseClientREST(action, table, payload = null, queryParams = '') {
+  const cfg = window.SUPABASE_CLIENT_CONFIG || {};
+  const url = (cfg.url || '').replace(/\/rest\/v1\/?$/i, '').replace(/\/$/, '');
+  const key = cfg.key || '';
+  if (!url || !key) throw new Error('Client Supabase URL/Key missing in js/supabase-config.js');
+
+  const headers = {
+    'apikey': key,
+    'Authorization': 'Bearer ' + key,
+    'Content-Type': 'application/json'
+  };
+
+  if (action === 'status') {
+    const res = await fetch(`${url}/rest/v1/${table}?select=id&limit=1`, { headers });
+    if (!res.ok) throw new Error(`REST status ${res.status}`);
+    return { connected: true, recordCount: 'Cloud REST' };
+  } else if (action === 'select') {
+    const res = await fetch(`${url}/rest/v1/${table}?${queryParams || 'select=*'}`, { headers });
+    if (!res.ok) throw new Error(`REST select ${res.status}`);
+    return await res.json();
+  } else if (action === 'upsert') {
+    headers['Prefer'] = 'resolution=merge-duplicates';
+    const res = await fetch(`${url}/rest/v1/${table}`, { method: 'POST', headers, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      const errTxt = await res.text();
+      throw new Error(`REST upsert ${res.status}: ${errTxt}`);
+    }
+    return true;
+  } else if (action === 'delete') {
+    const res = await fetch(`${url}/rest/v1/${table}?${queryParams}`, { method: 'DELETE', headers });
+    if (!res.ok) throw new Error(`REST delete ${res.status}`);
+    return true;
+  }
+}
 
 window.checkSupabaseStatusUI = async function() {
   const badge = document.getElementById('supabase-status-badge');
   const syncBtn = document.getElementById('btn-supabase-sync');
+  
+  // Try local Express server API first (when running on localhost:3000)
   try {
     const res = await fetch('/api/supabase/status');
-    const data = await res.json();
-    if (data.connected) {
+    if (res.ok) {
+      const data = await res.json();
+      if (data.connected) {
+        if (badge) {
+          badge.className = 'badge badge-success';
+          badge.style.background = '#10b981';
+          badge.style.color = '#ffffff';
+          badge.textContent = `☁️ Supabase: Connected (${(data.recordCount || 0).toLocaleString()} records)`;
+        }
+        if (syncBtn) syncBtn.style.display = 'inline-block';
+        AppState.isSupabaseConnected = true;
+        return;
+      }
+    }
+  } catch (err) {
+    // Fall back to Client-Side REST (when running on GitHub Pages / Static Host)
+  }
+
+  // Fallback: Direct REST check (For GitHub Pages)
+  try {
+    const restData = await supabaseClientREST('status', 'attendance_records');
+    if (restData.connected) {
       if (badge) {
         badge.className = 'badge badge-success';
         badge.style.background = '#10b981';
         badge.style.color = '#ffffff';
-        badge.textContent = `☁️ Supabase: Connected (${(data.recordCount || 0).toLocaleString()} records)`;
+        badge.textContent = `☁️ Supabase: Connected (GitHub Pages / Client REST)`;
       }
       if (syncBtn) syncBtn.style.display = 'inline-block';
       AppState.isSupabaseConnected = true;
-    } else {
-      if (badge) {
-        badge.className = 'badge badge-info';
-        badge.style.background = '#3b82f6';
-        badge.style.color = '#ffffff';
-        badge.textContent = '💻 Local Mode (Offline/No .env)';
-      }
-      if (syncBtn) syncBtn.style.display = 'none';
-      AppState.isSupabaseConnected = false;
+      return;
     }
-  } catch (err) {
-    if (badge) {
-      badge.className = 'badge badge-secondary';
-      badge.textContent = '💻 Local Mode';
-    }
-    if (syncBtn) syncBtn.style.display = 'none';
+  } catch (restErr) {
+    // Both server and REST check failed or not configured
   }
+
+  if (badge) {
+    badge.className = 'badge badge-info';
+    badge.style.background = '#3b82f6';
+    badge.style.color = '#ffffff';
+    const isGitHub = window.location.hostname.includes('github.io');
+    badge.textContent = isGitHub ? '💻 Local Static Mode (ใส่ key ใน js/supabase-config.js เพื่อเชื่อม Cloud)' : '💻 Local Mode (Offline/No .env)';
+  }
+  if (syncBtn) syncBtn.style.display = 'none';
+  AppState.isSupabaseConnected = false;
 };
 
 window.syncAllToSupabase = async function() {
@@ -3322,6 +3381,7 @@ window.syncAllToSupabase = async function() {
   if (syncBtn) syncBtn.textContent = '⏳ กำลังซิงค์...';
   
   try {
+    // Try server sync first
     const res = await fetch('/api/supabase/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -3330,15 +3390,52 @@ window.syncAllToSupabase = async function() {
         records: AppState.processedRecords
       })
     });
-    const result = await res.json();
-    if (result.success) {
-      alert(`🎉 ซิงค์สำเร็จ! บันทึกข้อมูล ${result.count || AppState.processedRecords.length} รายการลง Supabase Cloud Database ถาวรเรียบร้อยแล้วครับ`);
-      checkSupabaseStatusUI();
-    } else {
-      alert('ไม่สามารถซิงค์ข้อมูลได้: ' + result.message);
+    if (res.ok) {
+      const result = await res.json();
+      if (result.success) {
+        alert(`🎉 ซิงค์ผ่าน Server สำเร็จ! บันทึกข้อมูล ${result.count || AppState.processedRecords.length} รายการลง Supabase Cloud Database ถาวรเรียบร้อยแล้วครับ`);
+        checkSupabaseStatusUI();
+        return;
+      }
     }
   } catch (err) {
-    alert('เกิดข้อผิดพลาดขณะเชื่อมต่อเซิร์ฟเวอร์เพื่อซิงค์: ' + err.message);
+    // Server failed, fall back to Direct REST chunked upsert (for GitHub Pages)
+  }
+
+  try {
+    const records = AppState.processedRecords;
+    const batchId = 'CLIENT_REST_SYNC_' + Date.now();
+    const rows = records.map(rec => ({
+      emp_id: String(rec.empId || ''),
+      emp_name: String(rec.empName || ''),
+      dept_name: String(rec.dept || ''),
+      work_date: rec.workDate || null,
+      scan_in: rec.scanIn || null,
+      scan_out: rec.scanOut || null,
+      status_in: rec.statusIn || 'ขาด/ไม่แตะเข้า',
+      status_out: rec.statusOut || 'ขาด/ไม่แตะออก',
+      is_late: Boolean(rec.isLate),
+      late_mins: Number(rec.lateMins || 0),
+      is_early_out: Boolean(rec.isEarlyOut),
+      early_out_mins: Number(rec.earlyOutMins || 0),
+      work_hours: Number(rec.workHours || 0),
+      shift_code: rec.shiftCode || null,
+      shift_type: rec.shiftType || 'Workshop Office 07:00-16:00',
+      food_allowance: Number(rec.foodAllowance || 0),
+      batch_upload_id: batchId
+    })).filter(r => r.emp_id && r.work_date);
+
+    // Chunk size 500 for REST
+    let count = 0;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      await supabaseClientREST('upsert', 'attendance_records', chunk);
+      count += chunk.length;
+    }
+    alert(`🎉 ซิงค์ผ่าน GitHub Pages (REST Client) สำเร็จ! บันทึกข้อมูล ${count} รายการลง Supabase Cloud Database ถาวรเรียบร้อยแล้วครับ`);
+    checkSupabaseStatusUI();
+  } catch (restErr) {
+    alert('ไม่สามารถซิงค์ข้อมูลได้ (กรุณาตรวจสอบ URL และ Public Key ในไฟล์ js/supabase-config.js): ' + restErr.message);
   } finally {
     if (syncBtn) syncBtn.textContent = origText || '☁️ ซิงค์ขึ้น Cloud';
   }
@@ -3347,15 +3444,73 @@ window.syncAllToSupabase = async function() {
 async function syncOverridesFromSupabase() {
   try {
     const res = await fetch('/api/supabase/overrides');
-    const data = await res.json();
-    if (data.success && data.overrides && Object.keys(data.overrides).length > 0) {
-      // Merge Cloud overrides into AppState.overrides
-      Object.assign(AppState.overrides, data.overrides);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.overrides && Object.keys(data.overrides).length > 0) {
+        Object.assign(AppState.overrides, data.overrides);
+        localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
+        recalculateAndRenderAll();
+        console.log('☁️ Loaded & merged Overrides from Server API');
+        return;
+      }
+    }
+  } catch (err) {}
+
+  try {
+    const rows = await supabaseClientREST('select', 'attendance_overrides');
+    if (Array.isArray(rows) && rows.length > 0) {
+      rows.forEach(r => {
+        const key = `${r.emp_id}_${r.work_date}`;
+        AppState.overrides[key] = {
+          overrideIn: r.override_in,
+          overrideOut: r.override_out,
+          overrideShift: r.override_shift,
+          grantFoodAllowance: r.grant_food_allowance,
+          reason: r.reason,
+          approver: r.approver,
+          timestamp: r.updated_at
+        };
+      });
       localStorage.setItem('hr_time_overrides_v1', JSON.stringify(AppState.overrides));
       recalculateAndRenderAll();
-      console.log('☁️ Loaded & merged Overrides from Supabase Cloud');
+      console.log('☁️ Loaded & merged Overrides from Direct REST Client (GitHub Pages)');
     }
-  } catch (err) {
-    console.warn('Could not pull overrides from Supabase:', err.message);
-  }
+  } catch (restErr) {}
+}
+
+async function syncSingleOverrideToSupabase(empId, dateStr, overrideData = null) {
+  // Try server first
+  try {
+    if (overrideData) {
+      await fetch('/api/supabase/overrides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empId, workDate: dateStr, overrideData })
+      });
+    } else {
+      await fetch('/api/supabase/overrides', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ empId, workDate: dateStr })
+      });
+    }
+  } catch (err) {}
+
+  // Fallback direct REST
+  try {
+    if (overrideData) {
+      await supabaseClientREST('upsert', 'attendance_overrides', {
+        emp_id: String(empId),
+        work_date: dateStr,
+        override_in: overrideData.overrideIn || overrideData.correctedIn || overrideData.scanIn || null,
+        override_out: overrideData.overrideOut || overrideData.correctedOut || overrideData.scanOut || null,
+        override_shift: overrideData.overrideShift || overrideData.type || null,
+        grant_food_allowance: Boolean(overrideData.grantFoodAllowance || overrideData.allowance === 25 || overrideData.status === 'APPROVED'),
+        reason: overrideData.reason || overrideData.note || 'HR Manual Override',
+        approver: overrideData.approver || 'HR Portal User'
+      });
+    } else {
+      await supabaseClientREST('delete', 'attendance_overrides', `emp_id=eq.${empId}&work_date=eq.${dateStr}`);
+    }
+  } catch (restErr) {}
 }
