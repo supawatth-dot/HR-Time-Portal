@@ -856,7 +856,10 @@ async function loadDefaultExcel() {
 
   // Fallback: Static binary fetch for GitHub Pages or static host
   try {
-    const fileResp = await fetch('Clock in and out_01.01.26 to 30.06.26.xlsx');
+    let fileResp = await fetch(encodeURI('Clock in and out_01.01.26 to 30.06.26.xlsx'));
+    if (!fileResp.ok) {
+      fileResp = await fetch(encodeURI('public/Clock in and out_01.01.26 to 30.06.26.xlsx'));
+    }
     if (fileResp.ok) {
       const buffer = await fileResp.arrayBuffer();
       const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array', cellDates: false });
@@ -1270,7 +1273,7 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
   }
 
   const isWorkshop = (dept && String(dept).toLowerCase().includes('workshop')) || mode === 'workshop' || AppState.mode === 'workshop';
-  if (isWorkshop && !dws.includes('15:30') && !dws.includes('16:30') && !dws.includes('night') && mode !== 'night') {
+  if (isWorkshop && dwsText && !dws.includes('15:30') && !dws.includes('16:30') && !dws.includes('night') && mode !== 'night') {
     if (isPreHoliday) {
       return { targetSeconds: 25200, targetOutSeconds: 57600, targetStr: '07:00-16:00', isNightShift: false, normInSecs: clockInSeconds };
     } else {
@@ -1328,9 +1331,9 @@ function detectShiftTarget(dwsText, clockInSeconds, clockOutSeconds, isPreHolida
  */
 function getColumnIndices(headers, firstRow) {
   const map = {
-    empId: 0,
-    empName: 1,
-    date: 2,
+    empId: -1,
+    empName: -1,
+    date: -1,
     dwsCode: -1,
     dwsText: -1,
     clockIn: -1,
@@ -1348,59 +1351,63 @@ function getColumnIndices(headers, firstRow) {
   if (Array.isArray(headers) && headers.length > 0) {
     headers.forEach((h, idx) => {
       const col = String(h || '').trim().toLowerCase();
-      if (col === 'employee id' || col === 'รหัสพนักงาน' || col.includes('emp id')) map.empId = idx;
-      else if (col === 'name' || col === 'ชื่อ-นามสกุล' || col === 'employee name') map.empName = idx;
-      else if (col === 'date' || col === 'วันที่') map.date = idx;
-      else if (col === 'clock-in' || col === 'clock in' || col === 'เข้างาน' || col === 'เวลาเข้า') map.clockIn = idx;
-      else if (col === 'clock-out' || col === 'clock out' || col === 'ออกงาน' || col === 'เวลาออก') map.clockOut = idx;
-      else if (col.includes('dws') && (col.includes('code') || col.includes('รหัส'))) map.dwsCode = idx;
-      else if (col.includes('dws') && (col.includes('text') || col.includes('ตาราง') || col.includes('กะ'))) map.dwsText = idx;
+      if (col === 'employee id' || col === 'รหัสพนักงาน' || col.includes('emp id') || col === 'person id' || col === 'emp_id') map.empId = idx;
+      else if (col === 'name' || col === 'ชื่อ-นามสกุล' || col === 'employee name' || col === 'person name' || col === 'emp_name' || col.includes('name')) map.empName = idx;
+      else if (col === 'date' || col === 'วันที่' || col === 'work_date') map.date = idx;
+      else if (col === 'clock-in' || col === 'clock in' || col === 'เข้างาน' || col === 'เวลาเข้า' || col === 'scan_in') map.clockIn = idx;
+      else if (col === 'clock-out' || col === 'clock out' || col === 'ออกงาน' || col === 'เวลาออก' || col === 'scan_out') map.clockOut = idx;
+      else if (col === 'dws' || col === 'shift code' || col === 'dws code' || col === 'รหัสกะ' || col === 'shift_code' || (col.includes('dws') && (col.includes('code') || col.includes('รหัส')))) map.dwsCode = idx;
+      else if (col === 'daily work schedule text' || col === 'dws text' || col === 'ตารางงาน' || col === 'กะการทำงาน' || col === 'schedule text' || col === 'shift_type' || col.includes('schedule') || (col.includes('dws') && (col.includes('text') || col.includes('ตาราง') || col.includes('กะ')))) map.dwsText = idx;
       else if (col === 'effective working hours' || col.includes('effective')) map.effHours = idx;
-      else if (col === 'actual working hours' || col.includes('actual')) map.actHours = idx;
+      else if (col === 'actual working hours' || col.includes('actual') || col === 'work_hours') map.actHours = idx;
       else if (col === 'ot 1.0') map.ot1 = idx;
       else if (col === 'ot 1.5') map.ot15 = idx;
       else if (col === 'ot 2.0') map.ot2 = idx;
       else if (col === 'ot 3.0') map.ot3 = idx;
-      else if (col === 'absence description' || col === 'leave reason' || col.includes('description') || col.includes('หมายเหตุ')) map.leaveReason = idx;
-      else if (col === 'department' || col === 'แผนก' || col === 'หน่วยงาน') map.dept = idx;
+      else if (col === 'absence description' || col === 'leave reason' || col === 'leave_reason' || col.includes('description') || col.includes('หมายเหตุ')) map.leaveReason = idx;
+      else if (col === 'department' || col === 'แผนก' || col === 'หน่วยงาน' || col === 'dept_name') map.dept = idx;
     });
   }
 
-  // Fallback: If exact header detection didn't find clockIn or dept, detect by row structure/length
-  if (map.clockIn === -1 || map.clockOut === -1) {
+  // Auto-fill DWS indices for 22-column structure if clockIn is at index 5 and DWS not matched
+  if (map.clockIn === 5 && map.dwsCode === -1) map.dwsCode = 3;
+  if (map.clockIn === 5 && map.dwsText === -1) map.dwsText = 4;
+
+  // Fallback: If exact header detection didn't find clockIn or dwsText or dept, detect by row structure/length
+  if (map.clockIn === -1 || map.clockOut === -1 || map.dwsText === -1 || map.empId === -1) {
     const is20Cols = (headers && headers.length <= 20) || (firstRow && firstRow.length <= 20);
     if (is20Cols) {
       // Standard 20-column Clock in and out export (e.g. C:\HR\Clock in and out_01.01.26 to 30.06.26.xlsx)
-      map.empId = 0;
-      map.empName = 1;
-      map.date = 2;
-      map.clockIn = 3;
-      map.clockOut = 4;
-      map.effHours = 5;
-      map.actHours = 6;
-      map.ot1 = 7;
-      map.ot15 = 8;
-      map.ot2 = 9;
-      map.ot3 = 10;
-      map.leaveReason = 14;
-      map.dept = 19;
+      if (map.empId === -1) map.empId = 0;
+      if (map.empName === -1) map.empName = 1;
+      if (map.date === -1) map.date = 2;
+      if (map.clockIn === -1) map.clockIn = 3;
+      if (map.clockOut === -1) map.clockOut = 4;
+      if (map.effHours === -1) map.effHours = 5;
+      if (map.actHours === -1) map.actHours = 6;
+      if (map.ot1 === -1) map.ot1 = 7;
+      if (map.ot15 === -1) map.ot15 = 8;
+      if (map.ot2 === -1) map.ot2 = 9;
+      if (map.ot3 === -1) map.ot3 = 10;
+      if (map.leaveReason === -1) map.leaveReason = 14;
+      if (map.dept === -1) map.dept = 19;
     } else {
       // Legacy 22+ column export (with DWS at index 3 & 4)
-      map.empId = 0;
-      map.empName = 1;
-      map.date = 2;
-      map.dwsCode = 3;
-      map.dwsText = 4;
-      map.clockIn = 5;
-      map.clockOut = 6;
-      map.effHours = 7;
-      map.actHours = 8;
-      map.ot1 = 9;
-      map.ot15 = 10;
-      map.ot2 = 11;
-      map.ot3 = 12;
-      map.leaveReason = 16;
-      map.dept = 21;
+      if (map.empId === -1) map.empId = 0;
+      if (map.empName === -1) map.empName = 1;
+      if (map.date === -1) map.date = 2;
+      if (map.dwsCode === -1) map.dwsCode = 3;
+      if (map.dwsText === -1) map.dwsText = 4;
+      if (map.clockIn === -1) map.clockIn = 5;
+      if (map.clockOut === -1) map.clockOut = 6;
+      if (map.effHours === -1) map.effHours = 7;
+      if (map.actHours === -1) map.actHours = 8;
+      if (map.ot1 === -1) map.ot1 = 9;
+      if (map.ot15 === -1) map.ot15 = 10;
+      if (map.ot2 === -1) map.ot2 = 11;
+      if (map.ot3 === -1) map.ot3 = 12;
+      if (map.leaveReason === -1) map.leaveReason = 16;
+      if (map.dept === -1) map.dept = 21;
     }
   }
 
@@ -1529,7 +1536,7 @@ function recalculateAndRenderAll() {
     const isOfficeRole = !isWorkshop || effectiveMode === 'dws' || /office|account|sales|hr|purchas|admin/i.test(dept);
     const isClockIn1200 = clockInInfo.seconds === 43200 || clockInInfo.str.startsWith('12:00');
 
-    const isWeekendOrOff = (dayOfWeek === 0 || dayOfWeek === 6 || dwsText === 'OFF' || dwsText === 'วันหยุด' || dwsText === '-' || dwsText === '');
+    const isWeekendOrOff = (dayOfWeek === 0 || dayOfWeek === 6 || dwsText.toUpperCase() === 'OFF' || dwsText === 'วันหยุด' || dwsText.toLowerCase().includes('off') || ((dwsText === '-' || dwsText === '') && clockInInfo.seconds === 0 && clockOutInfo.seconds === 0 && actualHours === 0));
 
     const hasAnyLeave = Boolean(leaveReason && leaveReason !== '-' && leaveReason !== '0' && leaveReason.trim() !== '');
 
